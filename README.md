@@ -1,3 +1,5 @@
+![Salak — A lightweight Markdown reader](docs/assets/salak-banner.png)
+
 # Salak
 
 A lightweight, read-only Markdown reader for the desktop.
