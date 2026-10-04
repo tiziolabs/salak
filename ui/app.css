@@ -44,7 +44,7 @@ body {
 
 body.no-sidebar #sidebar,
 body.no-root #sidebar,
-body.welcome #content { display: none; }
+body.welcome #pane { display: none; }
 
 #sidebar {
   flex: 0 0 auto;
@@ -103,8 +103,104 @@ body.welcome #content { display: none; }
 #tree li.dir.expanded > .row .twisty::before { content: "▾"; }
 #tree li.dir:not(.expanded) > ul { display: none; }
 
+#pane {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#tabs {
+  flex: 0 0 auto;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+#tabs[hidden] { display: none; }
+
+#tabs .tab {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 80px;
+  max-width: 220px;
+  padding: 6px 6px 6px 12px;
+  border-right: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+#tabs .tab:hover { background: var(--hover); }
+
+#tabs .tab.active {
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: inset 0 2px var(--accent);
+}
+
+#tabs .label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#tabs .close {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: 14px/18px system-ui, sans-serif;
+  cursor: pointer;
+  visibility: hidden;
+}
+
+#tabs .tab:hover .close,
+#tabs .tab.active .close { visibility: visible; }
+#tabs .close:hover { background: var(--border); }
+
+#tab-menu {
+  position: fixed;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 4px 16px #0004;
+}
+
+#tab-menu[hidden] { display: none; }
+
+#tab-menu button {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+#tab-menu button:hover:enabled,
+#tab-menu button:focus-visible { background: var(--selected); outline: none; }
+#tab-menu button:disabled { color: var(--muted); opacity: .6; cursor: default; }
+
 #content {
   flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: auto;

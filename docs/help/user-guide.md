@@ -28,7 +28,13 @@ The tree only lists folders and Markdown files (`.md`, `.markdown`, `.mdown`,
 Links to other Markdown files of the folder open in Salak, links to web pages
 open in the default browser, and `#section` links scroll to their heading.
 
-When the opened file changes on disk, a banner offers to reload it.
+Every document opens in its own tab, right after the current one; a document
+already open is brought to the front. A tab is closed with its `×` button, a
+middle click or `Ctrl+W`. A right click on a tab offers to close it, the other
+tabs, or the tabs on its right or its left.
+
+When the opened file changes on disk, a banner offers to reload it. A tab in
+the background is read again when it is brought back to the front.
 
 ## Keys
 
@@ -36,6 +42,8 @@ When the opened file changes on disk, a banner offers to reload it.
 | --- | --- |
 | `Ctrl+O` | Open a file |
 | `Ctrl+Shift+O` | Open a folder |
+| `Ctrl+W` | Close the tab |
+| `Ctrl+PageDown` / `Ctrl+PageUp` | Next / previous tab |
 | `Ctrl+Q` | Quit |
 | `F1` | Show this guide |
 | `Tab` | Switch focus between the tree and the document |

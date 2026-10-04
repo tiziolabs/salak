@@ -147,6 +147,8 @@ fn set_title(window: &WebviewWindow, name: Option<&OsStr>) {
 struct Document {
     /// Canonical path, which may differ from the requested one.
     path: String,
+    /// Name shown in its tab.
+    title: String,
     html: String,
 }
 
@@ -166,6 +168,7 @@ fn open_help(window: WebviewWindow, name: String) -> Result<Document, String> {
     Ok(Document {
         // Help pages link to each other with `help:` URLs, not paths.
         path: format!("help:{name}"),
+        title: title.to_string(),
         html: render::render(markdown, Path::new(""), Path::new("")),
     })
 }
@@ -197,8 +200,17 @@ async fn open_file(
     set_title(&window, file.file_name());
     Ok(Document {
         path: file.to_string_lossy().into_owned(),
+        title: file.file_name().unwrap_or_default().to_string_lossy().into_owned(),
         html,
     })
+}
+
+/// Once the last tab is closed: stops watching its file.
+#[tauri::command]
+fn close_document(window: WebviewWindow, state: State<AppState>) {
+    *state.doc_watcher.lock().unwrap() = None;
+    let root = state.root.lock().unwrap();
+    set_title(&window, root.as_deref().and_then(Path::file_name));
 }
 
 #[tauri::command]
@@ -279,6 +291,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
                 true,
                 Some("CmdOrCtrl+Shift+O"),
             )?,
+            &MenuItem::with_id(app, "close-tab", "&Close Tab", true, Some("CmdOrCtrl+W"))?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "quit", "&Quit", true, Some("CmdOrCtrl+Q"))?,
         ],
@@ -328,7 +341,15 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
-            session, list_dir, open_file, open_path, pick, open_help, open_url, user_style
+            session,
+            list_dir,
+            open_file,
+            close_document,
+            open_path,
+            pick,
+            open_help,
+            open_url,
+            user_style
         ])
         .setup(|app| {
             // Lets the webview load images located in the opened folder.

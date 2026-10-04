@@ -5,6 +5,7 @@
 A lightweight, read-only Markdown reader for the desktop.
 
 - File tree of a folder, IDE style, loaded lazily.
+- Tabs, one per opened document.
 - GitHub-like rendering: tables, footnotes, task lists, strikethrough.
 - Light and dark themes, following the system preference.
 - Custom style sheet, applied live while you edit it.
@@ -31,6 +32,8 @@ salak --css dark.css  # use another style sheet
 | --- | --- |
 | `Ctrl+O` | Open a file |
 | `Ctrl+Shift+O` | Open a folder |
+| `Ctrl+W` | Close the tab |
+| `Ctrl+PageDown` / `Ctrl+PageUp` | Next / previous tab |
 | `Ctrl+Q` | Quit |
 | `F1` | Show the user guide |
 | `Tab` | Switch focus between the tree and the document |

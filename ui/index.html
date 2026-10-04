@@ -21,9 +21,18 @@
     </div>
     <p class="hint">New to Salak? Read the <a id="open-guide" href="#">user guide</a> (<kbd>F1</kbd>).</p>
   </section>
-  <main id="content" tabindex="-1">
-    <div id="banner" role="alert" hidden></div>
-    <div id="doc"></div>
-  </main>
+  <div id="pane">
+    <div id="tabs" role="tablist" hidden></div>
+    <main id="content" tabindex="-1">
+      <div id="banner" role="alert" hidden></div>
+      <div id="doc"></div>
+    </main>
+  </div>
+  <div id="tab-menu" role="menu" hidden>
+    <button role="menuitem" data-action="close">Close This Tab</button>
+    <button role="menuitem" data-action="close-others">Close Other Tabs</button>
+    <button role="menuitem" data-action="close-right">Close Tabs to the Right</button>
+    <button role="menuitem" data-action="close-left">Close Tabs to the Left</button>
+  </div>
 </body>
 </html>

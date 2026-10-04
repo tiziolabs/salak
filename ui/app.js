@@ -112,7 +112,7 @@ async function activate(row) {
     if (li.classList.contains("expanded")) collapse(li);
     else await expand(li);
   } else {
-    await openFile(li.dataset.path);
+    await openTab(li.dataset.path);
   }
 }
 
@@ -181,7 +181,7 @@ function scrollToId(id) {
   article.querySelector(`[id="${CSS.escape(id)}"]`)?.scrollIntoView();
 }
 
-function showDocument(doc, fragment) {
+function showDocument(doc) {
   current = doc.path;
   banner.hidden = true;
   // Parsing in a <template> does not start image loads before insertion.
@@ -189,38 +189,230 @@ function showDocument(doc, fragment) {
   template.innerHTML = doc.html;
   article.replaceChildren(template.content);
   markActive(current);
-  content.scrollTop = 0;
+}
+
+// Help pages are embedded in the binary and use `help:<name>` as path.
+function load(path) {
+  return path.startsWith("help:")
+    ? invoke("open_help", { name: path.slice(5) })
+    : invoke("open_file", { path });
+}
+
+// ---------------------------------------------------------------- tabs
+
+const tabBar = document.getElementById("tabs");
+const tabMenu = document.getElementById("tab-menu");
+
+// Open documents, in the order of the tab bar: { path, title, scroll }.
+// Only the active one is rendered and watched; the others are read again
+// when activated, so they never show a stale version.
+let tabs = [];
+let active = null;
+// Counts loads, so that a slow one cannot overwrite a newer one.
+let loads = 0;
+
+function renderTabs() {
+  tabBar.replaceChildren(
+    ...tabs.map((tab, index) => {
+      const element = document.createElement("div");
+      element.className = "tab";
+      element.dataset.index = index;
+      element.setAttribute("role", "tab");
+      element.setAttribute("aria-selected", tab === active);
+      element.classList.toggle("active", tab === active);
+      element.title = tab.path.startsWith("help:") ? tab.title : tab.path;
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = tab.title;
+      const close = document.createElement("button");
+      close.className = "close";
+      close.tabIndex = -1;
+      close.title = "Close (Ctrl+W)";
+      close.textContent = "×";
+      element.append(label, close);
+      return element;
+    }),
+  );
+  tabBar.hidden = tabs.length === 0;
+  tabBar.querySelector(".active")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+async function activate(tab, fragment = "") {
+  if (active && active !== tab) active.scroll = content.scrollTop;
+  active = tab;
+  renderTabs();
+  const ticket = ++loads;
+  let doc;
+  try {
+    doc = await load(tab.path);
+  } catch (err) {
+    if (ticket !== loads) return;
+    current = tab.path;
+    banner.hidden = true;
+    showMessage(String(err));
+    return;
+  }
+  if (ticket !== loads) return;
+
+  // The canonical path may reveal that this file is already open.
+  const twin = tabs.find((other) => other !== tab && other.path === doc.path);
+  if (twin) {
+    tabs.splice(tabs.indexOf(tab), 1);
+    active = tab = twin;
+  }
+  tab.path = doc.path;
+  tab.title = doc.title;
+  renderTabs();
+  showDocument(doc);
+  content.scrollTop = fragment ? 0 : tab.scroll;
   if (fragment) scrollToId(decodeURIComponent(fragment));
 }
 
-async function openFile(path, fragment = "") {
-  try {
-    showDocument(await invoke("open_file", { path }), fragment);
-  } catch (err) {
-    showMessage(String(err));
-  }
-}
-
-// Help pages are embedded in the binary. Without a folder, they replace the
-// welcome page until `Esc`.
-async function openHelp(name) {
-  try {
-    const doc = await invoke("open_help", { name });
-    welcome.hidden = true;
-    document.body.classList.remove("welcome");
-    showDocument(doc);
-    content.focus();
-  } catch (err) {
-    showMessage(String(err));
-  }
-}
-
+// Reads the active document again, keeping its scroll position.
 async function reload() {
-  if (!current) return;
-  const top = content.scrollTop;
-  if (current.startsWith("help:")) await openHelp(current.slice(5));
-  else await openFile(current);
-  content.scrollTop = top;
+  if (!active) return;
+  active.scroll = content.scrollTop;
+  await activate(active);
+}
+
+// Opens a document in a new tab, right after the active one. A document
+// already open is only brought to the front.
+async function openTab(path, fragment = "") {
+  let tab = tabs.find((other) => other.path === path);
+  if (!tab) {
+    const title = path.startsWith("help:") ? path.slice(5) : path.split(session.separator).pop();
+    tab = { path, title, scroll: 0 };
+    tabs.splice(active ? tabs.indexOf(active) + 1 : tabs.length, 0, tab);
+  }
+  welcome.hidden = true;
+  document.body.classList.remove("welcome");
+  if (tab === active) {
+    if (fragment) scrollToId(decodeURIComponent(fragment));
+    return;
+  }
+  await activate(tab, fragment);
+}
+
+function closeTabs(closing) {
+  if (closing.length === 0) return;
+  const before = tabs;
+  tabs = tabs.filter((tab) => !closing.includes(tab));
+  if (!closing.includes(active)) {
+    renderTabs();
+    return;
+  }
+  // As in browsers: the tab on the right of the active one, else on its left.
+  const index = before.indexOf(active);
+  const next =
+    before.slice(index + 1).find((tab) => tabs.includes(tab)) ??
+    before.slice(0, index).reverse().find((tab) => tabs.includes(tab));
+  if (next) {
+    activate(next);
+    return;
+  }
+  active = null;
+  current = null;
+  loads++;
+  renderTabs();
+  banner.hidden = true;
+  markActive(null);
+  invoke("close_document").catch(console.error);
+  // Without a folder, the welcome page comes back.
+  if (session.root) showMessage("Select a Markdown file in the tree.");
+  else start(session);
+}
+
+function tabAt(element) {
+  const tab = element?.closest(".tab");
+  return tab ? tabs[Number(tab.dataset.index)] : null;
+}
+
+tabBar.addEventListener("click", (event) => {
+  const tab = tabAt(event.target);
+  if (!tab) return;
+  if (event.target.closest(".close")) closeTabs([tab]);
+  else if (tab !== active) activate(tab);
+});
+
+// Middle click closes, as in browsers.
+tabBar.addEventListener("mousedown", (event) => {
+  if (event.button === 1) event.preventDefault();
+});
+tabBar.addEventListener("auxclick", (event) => {
+  const tab = tabAt(event.target);
+  if (tab && event.button === 1) closeTabs([tab]);
+});
+
+function cycleTabs(delta) {
+  if (tabs.length < 2) return;
+  activate(tabs[(tabs.indexOf(active) + delta + tabs.length) % tabs.length]);
+}
+
+// ---------------------------------------------------------------- tab menu
+
+let menuTab = null;
+
+function tabsToClose(action, tab) {
+  const index = tabs.indexOf(tab);
+  switch (action) {
+    case "close":
+      return [tab];
+    case "close-others":
+      return tabs.filter((other) => other !== tab);
+    case "close-right":
+      return tabs.slice(index + 1);
+    case "close-left":
+      return tabs.slice(0, index);
+  }
+  return [];
+}
+
+function showTabMenu(tab, x, y) {
+  menuTab = tab;
+  for (const button of tabMenu.querySelectorAll("button")) {
+    button.disabled = tabsToClose(button.dataset.action, tab).length === 0;
+  }
+  tabMenu.hidden = false;
+  // Keeps the menu inside the window.
+  const { width, height } = tabMenu.getBoundingClientRect();
+  tabMenu.style.left = `${Math.min(x, window.innerWidth - width - 4)}px`;
+  tabMenu.style.top = `${Math.min(y, window.innerHeight - height - 4)}px`;
+  tabMenu.querySelector("button:enabled").focus();
+}
+
+// Focus only goes back to the document when the menu is left with the
+// keyboard: a click elsewhere puts it where it was clicked.
+function hideTabMenu(refocus = false) {
+  if (tabMenu.hidden) return;
+  tabMenu.hidden = true;
+  menuTab = null;
+  if (refocus) content.focus();
+}
+
+tabBar.addEventListener("contextmenu", (event) => {
+  const tab = tabAt(event.target);
+  if (!tab) return;
+  event.preventDefault();
+  showTabMenu(tab, event.clientX, event.clientY);
+});
+
+tabMenu.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button || !menuTab) return;
+  const closing = tabsToClose(button.dataset.action, menuTab);
+  hideTabMenu(true);
+  closeTabs(closing);
+});
+
+document.addEventListener("mousedown", (event) => {
+  if (!tabMenu.contains(event.target)) hideTabMenu();
+});
+window.addEventListener("blur", () => hideTabMenu());
+
+function moveInTabMenu(delta) {
+  const buttons = [...tabMenu.querySelectorAll("button:enabled")];
+  const index = buttons.indexOf(document.activeElement);
+  buttons[(index + delta + buttons.length) % buttons.length].focus();
 }
 
 // ---------------------------------------------------------------- changes
@@ -262,12 +454,12 @@ shadow.addEventListener("click", async (event) => {
   if (href.startsWith("#")) {
     scrollToId(decodeURIComponent(href.slice(1)));
   } else if (href.startsWith("help:")) {
-    await openHelp(href.slice(5));
+    await openTab(href);
   } else if (href.startsWith("salak:")) {
     const hash = href.indexOf("#");
     const path = decodeURIComponent(href.slice(6, hash < 0 ? undefined : hash));
     if (!MARKDOWN_FILE.test(path)) return;
-    await openFile(path, hash < 0 ? "" : href.slice(hash + 1));
+    await openTab(path, hash < 0 ? "" : href.slice(hash + 1));
     await reveal(current);
   } else {
     invoke("open_url", { url: href }).catch(console.error);
@@ -282,6 +474,10 @@ async function start(next) {
   session = next;
   current = null;
   selected = null;
+  tabs = [];
+  active = null;
+  loads++;
+  renderTabs();
   banner.hidden = true;
   welcome.hidden = session.root !== null;
   document.body.classList.toggle("welcome", session.root === null);
@@ -298,7 +494,7 @@ async function start(next) {
 
   if (session.initial) {
     await reveal(session.initial);
-    await openFile(session.initial);
+    await openTab(session.initial);
     content.focus();
   } else {
     showMessage("Select a Markdown file in the tree.");
@@ -311,7 +507,7 @@ async function openPath(path) {
   const next = await invoke("open_path", { path });
   // A file of the opened folder keeps the state of the tree.
   if (next.root === session.root && next.initial) {
-    await openFile(next.initial);
+    await openTab(next.initial);
     await reveal(current);
     content.focus();
   } else {
@@ -342,11 +538,16 @@ document.getElementById("open-guide").addEventListener("click", (event) => {
   openHelp("user-guide");
 });
 
+function openHelp(name) {
+  openTab(`help:${name}`).then(() => content.focus());
+}
+
 // Menu items, whose shortcuts (Ctrl+O, F1…) are handled by the menu itself.
 listen("menu", (event) => {
   const id = event.payload;
   if (id === "open-file") pick(false);
   else if (id === "open-folder") pick(true);
+  else if (id === "close-tab" && active) closeTabs([active]);
   else if (id.startsWith("help:")) openHelp(id.slice(5));
 });
 
@@ -378,15 +579,21 @@ document.addEventListener("keydown", (event) => {
   // The welcome page only has its buttons.
   if (!welcome.hidden) return;
   const ctrl = event.ctrlKey || event.metaKey;
-  if (event.key === "Tab" && !ctrl && !event.altKey) {
+  if (!tabMenu.hidden) {
+    if (event.key === "Escape") hideTabMenu(true);
+    else if (event.key === "ArrowDown") moveInTabMenu(1);
+    else if (event.key === "ArrowUp") moveInTabMenu(-1);
+    // Enter and Space activate the focused item.
+    else return;
+  } else if (ctrl && (event.key === "PageDown" || event.key === "PageUp")) {
+    cycleTabs(event.key === "PageDown" ? 1 : -1);
+  } else if (event.key === "Tab" && !ctrl && !event.altKey) {
     if (document.activeElement === tree || document.body.classList.contains("no-sidebar")) content.focus();
     else tree.focus();
   } else if ((event.key === "r" && !event.altKey) || event.key === "F5") {
     reload();
   } else if (event.key === "Escape" && !banner.hidden) {
     banner.hidden = true;
-  } else if (event.key === "Escape" && !session.root) {
-    start(session);
   } else if (event.key === "b" && !event.altKey) {
     toggleSidebar();
   } else if (content.contains(document.activeElement) && !ctrl && !event.altKey && scrollContent(event.key)) {
