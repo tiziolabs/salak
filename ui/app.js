@@ -1,4 +1,203 @@
 "use strict";
 
+const { invoke } = window.__TAURI__.core;
+
+const tree = document.getElementById("tree");
+const content = document.getElementById("content");
 const doc = document.getElementById("doc");
-doc.innerHTML = '<p class="placeholder">Salak</p>';
+
+let session = null;
+let current = null;
+let selected = null;
+
+// ---------------------------------------------------------------- tree
+
+function makeNode(entry, depth) {
+  const li = document.createElement("li");
+  li.dataset.path = entry.path;
+  li.dataset.depth = depth;
+  li.setAttribute("role", "treeitem");
+  if (entry.is_dir) li.classList.add("dir");
+
+  const row = document.createElement("div");
+  row.className = "row";
+  row.style.setProperty("--depth", depth);
+  const twisty = document.createElement("span");
+  twisty.className = "twisty";
+  const name = document.createElement("span");
+  name.textContent = entry.name;
+  row.append(twisty, name);
+  li.append(row);
+
+  if (entry.is_dir) li.append(document.createElement("ul"));
+  return li;
+}
+
+async function fillList(ul, dirPath, depth) {
+  const entries = await invoke("list_dir", { path: dirPath });
+  ul.replaceChildren(...entries.map((entry) => makeNode(entry, depth)));
+  if (current) markActive(current);
+}
+
+// Children are re-read on every expansion, so the tree picks up new files.
+async function expand(li) {
+  await fillList(li.querySelector(":scope > ul"), li.dataset.path, Number(li.dataset.depth) + 1);
+  li.classList.add("expanded");
+}
+
+function collapse(li) {
+  li.classList.remove("expanded");
+}
+
+function findNode(path) {
+  return tree.querySelector(`li[data-path="${CSS.escape(path)}"]`);
+}
+
+/// Expands every ancestor folder of `path` so that it becomes visible.
+async function reveal(path) {
+  if (!path.startsWith(session.root + session.separator)) return;
+  const parts = path.slice(session.root.length + 1).split(session.separator);
+  let prefix = session.root;
+  for (const part of parts.slice(0, -1)) {
+    prefix += session.separator + part;
+    const li = findNode(prefix);
+    if (!li) return;
+    if (!li.classList.contains("expanded")) await expand(li);
+  }
+  const li = findNode(path);
+  if (li) select(li.firstElementChild);
+}
+
+function markActive(path) {
+  tree.querySelector(".row.active")?.classList.remove("active");
+  findNode(path)?.firstElementChild.classList.add("active");
+}
+
+function select(row) {
+  selected?.classList.remove("selected");
+  selected = row;
+  row.classList.add("selected");
+  row.scrollIntoView({ block: "nearest" });
+}
+
+function visibleRows() {
+  return [...tree.querySelectorAll(".row")].filter((row) => row.offsetParent !== null);
+}
+
+function moveSelection(delta) {
+  const rows = visibleRows();
+  if (rows.length === 0) return;
+  const index = rows.indexOf(selected);
+  const next = index < 0 ? 0 : Math.min(Math.max(index + delta, 0), rows.length - 1);
+  select(rows[next]);
+}
+
+async function activate(row) {
+  const li = row.parentElement;
+  if (li.classList.contains("dir")) {
+    if (li.classList.contains("expanded")) collapse(li);
+    else await expand(li);
+  } else {
+    await openFile(li.dataset.path);
+  }
+}
+
+tree.addEventListener("click", (event) => {
+  const row = event.target.closest(".row");
+  if (!row) return;
+  select(row);
+  activate(row);
+});
+
+tree.addEventListener("keydown", async (event) => {
+  if (event.ctrlKey || event.altKey || event.metaKey) return;
+  const li = selected?.parentElement;
+  const isDir = li?.classList.contains("dir");
+  const expanded = li?.classList.contains("expanded");
+
+  switch (event.key) {
+    case "ArrowDown":
+    case "j":
+      moveSelection(1);
+      break;
+    case "ArrowUp":
+    case "k":
+      moveSelection(-1);
+      break;
+    case "Home":
+    case "g":
+      moveSelection(-Infinity);
+      break;
+    case "End":
+    case "G":
+      moveSelection(Infinity);
+      break;
+    case "ArrowRight":
+    case "l":
+      if (isDir && !expanded) await expand(li);
+      else if (isDir) moveSelection(1);
+      break;
+    case "ArrowLeft":
+    case "h":
+      if (isDir && expanded) collapse(li);
+      else if (li && li.parentElement !== tree) select(li.parentElement.parentElement.firstElementChild);
+      break;
+    case "Enter":
+    case "o":
+      if (selected) await activate(selected);
+      break;
+    default:
+      return;
+  }
+  event.preventDefault();
+});
+
+// ---------------------------------------------------------------- document
+
+async function openFile(path) {
+  current = path;
+  markActive(path);
+  doc.textContent = path;
+}
+
+// ---------------------------------------------------------------- global keys
+
+function toggleSidebar() {
+  document.body.classList.toggle("no-sidebar");
+  if (document.body.classList.contains("no-sidebar")) content.focus();
+  else tree.focus();
+}
+
+document.addEventListener("keydown", (event) => {
+  const ctrl = event.ctrlKey || event.metaKey;
+  if (event.key === "Tab" && !ctrl && !event.altKey) {
+    if (document.activeElement === tree || document.body.classList.contains("no-sidebar")) content.focus();
+    else tree.focus();
+  } else if (event.key === "b" && !event.altKey) {
+    toggleSidebar();
+  } else {
+    return;
+  }
+  event.preventDefault();
+});
+
+// ---------------------------------------------------------------- startup
+
+(async () => {
+  session = await invoke("session");
+  document.getElementById("root-name").textContent = session.root_name;
+  tree.dataset.path = session.root;
+  await fillList(tree, session.root, 0);
+
+  if (session.initial) {
+    await reveal(session.initial);
+    await openFile(session.initial);
+    content.focus();
+  } else {
+    doc.innerHTML = '<p class="placeholder">Select a Markdown file in the tree.</p>';
+    moveSelection(0);
+    tree.focus();
+  }
+})().catch((err) => {
+  doc.textContent = String(err);
+});
