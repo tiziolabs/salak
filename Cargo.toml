@@ -15,12 +15,17 @@ serde = { version = "1", features = ["derive"] }
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 ammonia = "4"
 notify = "8"
+# Pure Rust regex engine: no dependency on the Oniguruma C library.
+syntect = { version = "5", optional = true, default-features = false, features = ["default-syntaxes", "html", "regex-fancy"] }
 
 [features]
 # Embed the `ui/` assets in the binary so a plain `cargo build` produces a
 # working executable, without needing the Tauri CLI or a dev server.
-default = ["custom-protocol"]
+default = ["custom-protocol", "highlight"]
 custom-protocol = ["tauri/custom-protocol"]
+# Syntax highlighting of code blocks. Disable it for a smaller binary with
+# `cargo build --release --no-default-features --features custom-protocol`.
+highlight = ["dep:syntect"]
 
 [profile.release]
 codegen-units = 1

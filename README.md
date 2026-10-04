@@ -80,6 +80,27 @@ h1, h2 { border-bottom: none; }
 Fonts must be installed on the system: for security, the style sheet cannot
 load resources from the network.
 
+Code blocks are highlighted with classes named after the scopes of the
+language grammars: `keyword.control.shell` gives `hl-keyword hl-control
+hl-shell`. Their colors are variables too:
+
+```css
+:host {
+  --hl-comment: #6c7086;
+  --hl-keyword: #cba6f7;
+  --hl-string: #a6e3a1;
+  --hl-constant: #fab387;   /* numbers, options like `-y` */
+  --hl-function: #89b4fa;   /* functions, shell commands */
+  --hl-type: #f9e2af;
+  --hl-variable: #f38ba8;
+  --hl-tag: #94e2d5;        /* HTML tags, Markdown headings */
+  --hl-inserted: #a6e3a1;   /* diffs */
+  --hl-deleted: #f38ba8;
+}
+
+.hl-comment { font-style: normal; }
+```
+
 ## Building
 
 Requirements on Linux: a Rust toolchain and the WebKitGTK development
@@ -96,6 +117,13 @@ Then a plain Cargo build is enough, the Tauri CLI is not needed:
 ```sh
 cargo build --release
 ./target/release/salak
+```
+
+Syntax highlighting of code blocks is enabled by default. It adds about
+2 MB to the binary; to build without it:
+
+```sh
+cargo build --release --no-default-features --features custom-protocol
 ```
 
 Run the tests with `cargo test`.

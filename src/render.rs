@@ -27,6 +27,8 @@ pub fn render(markdown: &str, file: &Path, root: &Path) -> String {
         .map(|event| rewrite_urls(event, base, root))
         .collect();
     add_heading_ids(&mut events);
+    #[cfg(feature = "highlight")]
+    let events = crate::highlight::highlight(events);
 
     let mut out = String::with_capacity(markdown.len() * 3 / 2);
     html::push_html(&mut out, events.into_iter());
@@ -173,6 +175,8 @@ fn sanitizer() -> ammonia::Builder<'static> {
         .add_tag_attributes("h6", &["id"])
         .add_tag_attributes("div", &["id", "class"])
         .add_tag_attributes("sup", &["class"])
+        // Highlighted tokens.
+        .add_tag_attributes("span", &["class"])
         // `language-xxx`, for syntax highlighting.
         .add_tag_attributes("code", &["class"])
         // Column alignment.
@@ -230,6 +234,16 @@ mod tests {
         let html = render_in("- [x] done\n\n| a |\n|:-:|\n| b |\n");
         assert!(html.contains("type=\"checkbox\""), "{html}");
         assert!(html.contains("text-align: center"), "{html}");
+    }
+
+    #[cfg(feature = "highlight")]
+    #[test]
+    fn highlights_known_languages_only() {
+        let html = render_in("```sh\necho \"<hi>\" # note\n```\n\n```nope\n<b>x</b>\n```\n");
+        assert!(html.contains("<code class=\"language-sh\">"), "{html}");
+        assert!(html.contains("<span class=\"hl-comment"), "{html}");
+        assert!(html.contains("&lt;hi&gt;"), "{html}");
+        assert!(html.contains("<code class=\"language-nope\">&lt;b&gt;x&lt;/b&gt;"), "{html}");
     }
 
     #[test]

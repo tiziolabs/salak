@@ -12,6 +12,17 @@
   --code-bg: #eff1f3;
   --link: #0969da;
   --mark: #fff8c5;
+  /* Syntax highlighting. */
+  --hl-comment: #59636e;
+  --hl-keyword: #cf222e;
+  --hl-string: #0a3069;
+  --hl-constant: #0550ae;
+  --hl-function: #8250df;
+  --hl-type: #953800;
+  --hl-variable: #953800;
+  --hl-tag: #116329;
+  --hl-inserted: #116329;
+  --hl-deleted: #82071e;
   color-scheme: light dark;
   display: block;
   background: var(--bg);
@@ -27,6 +38,16 @@
     --code-bg: #262c36;
     --link: #4493f8;
     --mark: #bb800926;
+    --hl-comment: #9198a1;
+    --hl-keyword: #ff7b72;
+    --hl-string: #a5d6ff;
+    --hl-constant: #79c0ff;
+    --hl-function: #d2a8ff;
+    --hl-type: #ffa657;
+    --hl-variable: #ffa657;
+    --hl-tag: #7ee787;
+    --hl-inserted: #aff5b4;
+    --hl-deleted: #ffdcd7;
   }
 }
 
@@ -107,6 +128,26 @@ pre code {
   font-size: 1em;
   background: transparent;
 }
+
+/* Syntax highlighting: tokens carry their TextMate scopes as `hl-` classes,
+   e.g. `keyword.control.shell` gives `hl-keyword hl-control hl-shell`. */
+.hl-comment { color: var(--hl-comment); font-style: italic; }
+.hl-keyword, .hl-storage { color: var(--hl-keyword); }
+.hl-string, .hl-markup.hl-raw { color: var(--hl-string); }
+.hl-constant, .hl-support.hl-constant { color: var(--hl-constant); }
+.hl-variable { color: var(--hl-variable); }
+.hl-variable.hl-parameter.hl-option { color: var(--hl-constant); }
+.hl-entity.hl-name.hl-function, .hl-support.hl-function,
+.hl-support.hl-macro, .hl-variable.hl-function { color: var(--hl-function); }
+.hl-entity.hl-name.hl-type, .hl-entity.hl-name.hl-class,
+.hl-support.hl-type, .hl-support.hl-class { color: var(--hl-type); }
+.hl-entity.hl-name.hl-tag, .hl-entity.hl-name.hl-section,
+.hl-markup.hl-heading { color: var(--hl-tag); }
+.hl-entity.hl-other.hl-attribute-name { color: var(--hl-constant); }
+.hl-markup.hl-inserted { color: var(--hl-inserted); }
+.hl-markup.hl-deleted { color: var(--hl-deleted); }
+.hl-markup.hl-bold { font-weight: 600; }
+.hl-markup.hl-italic { font-style: italic; }
 
 kbd {
   padding: .1em .4em;

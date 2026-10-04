@@ -3,6 +3,8 @@
 
 mod cli;
 mod files;
+#[cfg(feature = "highlight")]
+mod highlight;
 mod render;
 mod style;
 mod watch;
