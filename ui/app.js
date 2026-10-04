@@ -233,7 +233,6 @@ function renderTabs() {
       return element;
     }),
   );
-  tabBar.hidden = tabs.length === 0;
   tabBar.querySelector(".active")?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
@@ -569,11 +568,18 @@ function scrollContent(key) {
   return true;
 }
 
+// One button hides the sidebar from its header, the other one shows it
+// again from the tab bar; only one is visible at a time.
+const sidebarToggles = document.querySelectorAll(".sidebar-toggle");
+
 function toggleSidebar() {
-  document.body.classList.toggle("no-sidebar");
-  if (document.body.classList.contains("no-sidebar")) content.focus();
+  const hidden = document.body.classList.toggle("no-sidebar");
+  for (const button of sidebarToggles) button.setAttribute("aria-expanded", !hidden);
+  if (hidden) content.focus();
   else tree.focus();
 }
+
+for (const button of sidebarToggles) button.addEventListener("click", toggleSidebar);
 
 document.addEventListener("keydown", (event) => {
   // The welcome page only has its buttons.

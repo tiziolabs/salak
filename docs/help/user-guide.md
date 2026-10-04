@@ -20,6 +20,9 @@ salak README.md       # open a file, browsing its folder
 salak --css dark.css  # use another style sheet
 ```
 
+The button at the top of the sidebar, or `b`, hides it and gives the whole
+width to the document; a button on the left of the tabs shows it again.
+
 The tree only lists folders and Markdown files (`.md`, `.markdown`, `.mdown`,
 `.mkd`, `.mkdn`). Hidden files are skipped.
 
