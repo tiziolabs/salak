@@ -80,5 +80,7 @@ folder.
 
 ## Roadmap
 
-- Custom style sheet, overriding or replacing the default one.
+- Custom style sheet, overriding or replacing the default one, read from
+  `$XDG_CONFIG_HOME/salak/style.css` (`~/.config/salak/style.css` by default)
+  on Linux and `%APPDATA%\salak\style.css` on Windows.
 - Syntax highlighting of code blocks.
