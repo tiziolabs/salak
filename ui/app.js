@@ -106,7 +106,7 @@ function moveSelection(delta) {
   select(rows[next]);
 }
 
-async function activate(row) {
+async function activateRow(row) {
   const li = row.parentElement;
   if (li.classList.contains("dir")) {
     if (li.classList.contains("expanded")) collapse(li);
@@ -120,7 +120,7 @@ tree.addEventListener("click", (event) => {
   const row = event.target.closest(".row");
   if (!row) return;
   select(row);
-  activate(row);
+  activateRow(row);
 });
 
 tree.addEventListener("keydown", async (event) => {
@@ -158,7 +158,7 @@ tree.addEventListener("keydown", async (event) => {
       break;
     case "Enter":
     case "o":
-      if (selected) await activate(selected);
+      if (selected) await activateRow(selected);
       break;
     default:
       return;
