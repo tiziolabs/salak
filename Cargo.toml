@@ -2,6 +2,7 @@
 name = "salak"
 version = "0.1.0"
 description = "A lightweight Markdown reader"
+license = "MIT OR Apache-2.0"
 edition = "2021"
 rust-version = "1.77"
 
