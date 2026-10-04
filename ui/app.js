@@ -1,9 +1,11 @@
 "use strict";
 
 const { invoke } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
 
 const tree = document.getElementById("tree");
 const content = document.getElementById("content");
+const banner = document.getElementById("banner");
 
 // The document is rendered in a shadow root: its style sheet cannot leak
 // into the interface and vice versa.
@@ -180,6 +182,7 @@ async function openFile(path, fragment = "") {
   try {
     const result = await invoke("open_file", { path });
     current = result.path;
+    banner.hidden = true;
     // Parsing in a <template> does not start image loads before insertion.
     const template = document.createElement("template");
     template.innerHTML = result.html;
@@ -191,6 +194,32 @@ async function openFile(path, fragment = "") {
     showMessage(String(err));
   }
 }
+
+async function reload() {
+  if (!current) return;
+  const top = content.scrollTop;
+  await openFile(current);
+  content.scrollTop = top;
+}
+
+// ---------------------------------------------------------------- changes
+
+function showBanner() {
+  const text = document.createElement("span");
+  text.textContent = "This file has changed on disk.";
+  const reloadButton = document.createElement("button");
+  reloadButton.textContent = "Reload (r)";
+  reloadButton.addEventListener("click", reload);
+  const dismissButton = document.createElement("button");
+  dismissButton.textContent = "Dismiss (Esc)";
+  dismissButton.addEventListener("click", () => (banner.hidden = true));
+  banner.replaceChildren(text, reloadButton, dismissButton);
+  banner.hidden = false;
+}
+
+listen("file-changed", (event) => {
+  if (event.payload === current) showBanner();
+});
 
 shadow.addEventListener("click", async (event) => {
   const link = event.target.closest("a[href]");
@@ -240,6 +269,10 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Tab" && !ctrl && !event.altKey) {
     if (document.activeElement === tree || document.body.classList.contains("no-sidebar")) content.focus();
     else tree.focus();
+  } else if ((event.key === "r" && !event.altKey) || event.key === "F5") {
+    reload();
+  } else if (event.key === "Escape" && !banner.hidden) {
+    banner.hidden = true;
   } else if (event.key === "b" && !event.altKey) {
     toggleSidebar();
   } else if (content.contains(document.activeElement) && !ctrl && !event.altKey && scrollContent(event.key)) {

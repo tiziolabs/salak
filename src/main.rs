@@ -3,9 +3,11 @@
 
 mod files;
 mod render;
+mod watch;
 
 use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::process::Command;
+use std::sync::Mutex;
 
 use serde::Serialize;
 use tauri::{Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -15,6 +17,8 @@ struct AppState {
     root: PathBuf,
     /// File given on the command line, opened at startup.
     initial: Option<PathBuf>,
+    /// Watches the opened document. Replacing it stops the previous watch.
+    watcher: Mutex<Option<notify::RecommendedWatcher>>,
 }
 
 #[derive(Serialize)]
@@ -67,6 +71,11 @@ async fn open_file(
     let bytes = std::fs::read(&file).map_err(|err| format!("{path}: {err}"))?;
     let html = render::render(&String::from_utf8_lossy(&bytes), &file, &state.root);
 
+    let watcher = watch::watch(window.app_handle().clone(), file.clone())
+        .map_err(|err| eprintln!("salak: cannot watch {}: {err}", file.display()))
+        .ok();
+    *state.watcher.lock().unwrap() = watcher;
+
     // Shown by sway in the title bar / tab of the container.
     if let Some(name) = file.file_name() {
         let _ = window.set_title(&format!("{} - Salak", name.to_string_lossy()));
@@ -114,10 +123,10 @@ fn parse_args() -> Result<AppState, String> {
         .canonicalize()
         .map_err(|err| format!("{}: {err}", PathBuf::from(&arg).display()))?;
     if path.is_dir() {
-        Ok(AppState { root: path, initial: None })
+        Ok(AppState { root: path, initial: None, watcher: Mutex::default() })
     } else {
         let root = path.parent().map(PathBuf::from).unwrap_or_else(|| path.clone());
-        Ok(AppState { root, initial: Some(path) })
+        Ok(AppState { root, initial: Some(path), watcher: Mutex::default() })
     }
 }
 
