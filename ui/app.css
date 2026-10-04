@@ -42,7 +42,9 @@ body {
   overflow: hidden;
 }
 
-body.no-sidebar #sidebar { display: none; }
+body.no-sidebar #sidebar,
+body.welcome #sidebar,
+body.welcome #content { display: none; }
 
 #sidebar {
   flex: 0 0 auto;
@@ -134,4 +136,58 @@ body.no-sidebar #sidebar { display: none; }
   background: var(--bg);
   color: var(--fg);
   cursor: pointer;
+}
+
+#welcome {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 24px;
+  text-align: center;
+}
+
+#welcome[hidden] { display: none; }
+
+#welcome img { margin-bottom: 16px; }
+
+#welcome h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+#welcome p {
+  margin: 0 0 20px;
+  color: var(--muted);
+}
+
+#welcome .actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+#welcome button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--sidebar-bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+#welcome button:hover { background: var(--hover); }
+#welcome button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#welcome kbd {
+  font: 12px ui-monospace, monospace;
+  color: var(--muted);
 }

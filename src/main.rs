@@ -9,16 +9,20 @@ mod render;
 mod style;
 mod watch;
 
-use std::path::{PathBuf, MAIN_SEPARATOR};
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use std::process::Command;
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::{Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri_plugin_dialog::DialogExt;
 
 struct AppState {
     /// Folder shown in the tree. Every file access is confined to it.
-    root: PathBuf,
+    /// `None` until a file or a folder is opened.
+    root: Mutex<Option<PathBuf>>,
     /// File given on the command line, opened at startup.
     initial: Option<PathBuf>,
     /// User style sheet. It may not exist (yet).
@@ -29,29 +33,114 @@ struct AppState {
     style_watcher: Mutex<Option<notify::RecommendedWatcher>>,
 }
 
+/// What the frontend shows: a folder and, possibly, a file to open in it.
+/// Without a folder, it shows the welcome page.
 #[derive(Serialize)]
 struct Session {
-    root: String,
-    root_name: String,
+    root: Option<String>,
+    root_name: Option<String>,
     initial: Option<String>,
     separator: char,
 }
 
+impl Session {
+    fn new(root: Option<&Path>, initial: Option<&Path>) -> Self {
+        let lossy = |path: &Path| path.to_string_lossy().into_owned();
+        Session {
+            root: root.map(lossy),
+            root_name: root.map(|root| {
+                root.file_name()
+                    .map_or_else(|| lossy(root), |name| name.to_string_lossy().into_owned())
+            }),
+            initial: initial.map(lossy),
+            separator: MAIN_SEPARATOR,
+        }
+    }
+}
+
 #[tauri::command]
 fn session(state: State<AppState>) -> Session {
-    Session {
-        root: state.root.to_string_lossy().into_owned(),
-        root_name: state
-            .root
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| state.root.to_string_lossy().into_owned()),
-        initial: state
-            .initial
-            .as_ref()
-            .map(|path| path.to_string_lossy().into_owned()),
-        separator: MAIN_SEPARATOR,
+    Session::new(state.root.lock().unwrap().as_deref(), state.initial.as_deref())
+}
+
+fn current_root(state: &AppState) -> Result<PathBuf, String> {
+    state.root.lock().unwrap().clone().ok_or_else(|| "no folder is opened".into())
+}
+
+/// Splits a file or a folder given by the user into the folder to browse
+/// and the file to open, as on the command line.
+fn split_target(path: PathBuf) -> (PathBuf, Option<PathBuf>) {
+    if path.is_dir() {
+        (path, None)
+    } else {
+        let root = path.parent().map(PathBuf::from).unwrap_or_else(|| path.clone());
+        (root, Some(path))
     }
+}
+
+/// Opens a file or a folder chosen by the user. A file inside the folder
+/// already opened keeps it; any other file opens its own folder.
+#[tauri::command]
+async fn open_path(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<Session, String> {
+    let path = PathBuf::from(&path)
+        .canonicalize()
+        .map_err(|err| format!("{path}: {err}"))?;
+    let mut root = state.root.lock().unwrap();
+    let (new_root, file) = match root.as_deref() {
+        Some(current) if path.is_file() && path.starts_with(current) => {
+            (current.to_path_buf(), Some(path))
+        }
+        _ => split_target(path),
+    };
+    // Lets the webview load images located in the new folder.
+    window
+        .asset_protocol_scope()
+        .allow_directory(&new_root, true)
+        .map_err(|err| err.to_string())?;
+    if file.is_none() {
+        *state.doc_watcher.lock().unwrap() = None;
+        set_title(&window, new_root.file_name());
+    }
+    *root = Some(new_root);
+    Ok(Session::new(root.as_deref(), file.as_deref()))
+}
+
+/// Asks the user for a Markdown file, or a folder, to open.
+#[tauri::command]
+async fn pick(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    folder: bool,
+) -> Result<Option<String>, String> {
+    let mut dialog = window.dialog().file().set_parent(&window);
+    if let Some(root) = state.root.lock().unwrap().as_deref() {
+        dialog = dialog.set_directory(root);
+    }
+    let picked = if folder {
+        dialog.set_title("Open Folder").blocking_pick_folder()
+    } else {
+        dialog
+            .set_title("Open File")
+            .add_filter("Markdown", files::MARKDOWN_EXTENSIONS)
+            .blocking_pick_file()
+    };
+    picked
+        .map(|path| path.into_path().map(|path| path.to_string_lossy().into_owned()))
+        .transpose()
+        .map_err(|err| err.to_string())
+}
+
+/// Shown by sway in the title bar / tab of the container.
+fn set_title(window: &WebviewWindow, name: Option<&OsStr>) {
+    let title = match name {
+        Some(name) => format!("{} - Salak", name.to_string_lossy()),
+        None => "Salak".into(),
+    };
+    let _ = window.set_title(&title);
 }
 
 #[derive(Serialize)]
@@ -65,7 +154,7 @@ struct Document {
 
 #[tauri::command]
 async fn list_dir(state: State<'_, AppState>, path: String) -> Result<Vec<files::Entry>, String> {
-    let dir = files::resolve_in_root(&state.root, &path)?;
+    let dir = files::resolve_in_root(&current_root(&state)?, &path)?;
     files::list_dir(&dir)
 }
 
@@ -75,19 +164,17 @@ async fn open_file(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<Document, String> {
-    let file = files::resolve_in_root(&state.root, &path)?;
+    let root = current_root(&state)?;
+    let file = files::resolve_in_root(&root, &path)?;
     let bytes = std::fs::read(&file).map_err(|err| format!("{path}: {err}"))?;
-    let html = render::render(&String::from_utf8_lossy(&bytes), &file, &state.root);
+    let html = render::render(&String::from_utf8_lossy(&bytes), &file, &root);
 
     let watcher = watch::watch(window.app_handle().clone(), file.clone(), "file-changed")
         .map_err(|err| eprintln!("salak: cannot watch {}: {err}", file.display()))
         .ok();
     *state.doc_watcher.lock().unwrap() = watcher;
 
-    // Shown by sway in the title bar / tab of the container.
-    if let Some(name) = file.file_name() {
-        let _ = window.set_title(&format!("{} - Salak", name.to_string_lossy()));
-    }
+    set_title(&window, file.file_name());
     Ok(Document {
         path: file.to_string_lossy().into_owned(),
         html,
@@ -136,12 +223,13 @@ fn state_from_args(path: Option<PathBuf>, css: Option<PathBuf>) -> Result<AppSta
         path.canonicalize()
             .map_err(|err| format!("{}: {err}", path.display()))
     };
-    let path = canonicalize(path.unwrap_or_else(|| ".".into()))?;
-    let (root, initial) = if path.is_dir() {
-        (path, None)
-    } else {
-        let root = path.parent().map(PathBuf::from).unwrap_or_else(|| path.clone());
-        (root, Some(path))
+    // Without a path, the welcome page invites to open one.
+    let (root, initial) = match path {
+        Some(path) => {
+            let (root, initial) = split_target(canonicalize(path)?);
+            (Some(root), initial)
+        }
+        None => (None, None),
     };
     // An explicit style sheet must exist, the default one is optional.
     let style = match css {
@@ -149,12 +237,33 @@ fn state_from_args(path: Option<PathBuf>, css: Option<PathBuf>) -> Result<AppSta
         None => style::default_path(),
     };
     Ok(AppState {
-        root,
+        root: Mutex::new(root),
         initial,
         style,
         doc_watcher: Mutex::default(),
         style_watcher: Mutex::default(),
     })
+}
+
+fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let file = Submenu::with_items(
+        app,
+        "&File",
+        true,
+        &[
+            &MenuItem::with_id(app, "open-file", "&Open File…", true, Some("CmdOrCtrl+O"))?,
+            &MenuItem::with_id(
+                app,
+                "open-folder",
+                "Open &Folder…",
+                true,
+                Some("CmdOrCtrl+Shift+O"),
+            )?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "quit", "&Quit", true, Some("CmdOrCtrl+Q"))?,
+        ],
+    )?;
+    Menu::with_items(app, &[&file])
 }
 
 /// Tiling compositors (sway, i3, Hyprland) manage window chrome themselves:
@@ -187,14 +296,16 @@ fn main() {
     };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
-            session, list_dir, open_file, open_url, user_style
+            session, list_dir, open_file, open_path, pick, open_url, user_style
         ])
         .setup(|app| {
             // Lets the webview load images located in the opened folder.
-            let root = app.state::<AppState>().root.clone();
-            app.asset_protocol_scope().allow_directory(&root, true)?;
+            if let Some(root) = app.state::<AppState>().root.lock().unwrap().as_deref() {
+                app.asset_protocol_scope().allow_directory(root, true)?;
+            }
 
             // Without its folder, live reload starts with the next launch.
             let state = app.state::<AppState>();
@@ -209,6 +320,14 @@ fn main() {
                 .title("Salak")
                 .inner_size(1000.0, 700.0)
                 .decorations(!under_tiling_wm())
+                .menu(menu(app.handle())?)
+                .on_menu_event(|window, event| match event.id().as_ref() {
+                    "quit" => window.app_handle().exit(0),
+                    // The frontend handles the other items, like its keys.
+                    id => {
+                        let _ = window.emit("menu", id);
+                    }
+                })
                 .build()?;
             Ok(())
         })

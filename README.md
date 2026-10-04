@@ -18,7 +18,8 @@ plain HTML, CSS and JavaScript, with no framework, no bundler and no npm.
 ## Usage
 
 ```sh
-salak                 # browse the current directory
+salak                 # welcome page, to open a file or a folder
+salak .               # browse the current directory
 salak ~/notes         # browse a folder
 salak README.md       # open a file, browsing its folder
 salak --css dark.css  # use another style sheet
@@ -28,6 +29,9 @@ salak --css dark.css  # use another style sheet
 
 | Key | Action |
 | --- | --- |
+| `Ctrl+O` | Open a file |
+| `Ctrl+Shift+O` | Open a folder |
+| `Ctrl+Q` | Quit |
 | `Tab` | Switch focus between the tree and the document |
 | `↑` `↓` / `j` `k` | Move in the tree, scroll the document |
 | `←` `→` / `h` `l` | Collapse / expand a folder |

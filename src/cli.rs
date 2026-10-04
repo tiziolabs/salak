@@ -5,7 +5,8 @@ pub const USAGE: &str = "\
 Usage: salak [OPTIONS] [PATH]
 
 Reads the Markdown files of a folder. PATH is a folder to browse or a file
-to open, whose folder is then browsed. Defaults to the current directory.
+to open, whose folder is then browsed. Without PATH, a welcome page offers
+to open one.
 
 Options:
   --css FILE     Style sheet applied on top of the default style

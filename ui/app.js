@@ -6,6 +6,7 @@ const { listen } = window.__TAURI__.event;
 const tree = document.getElementById("tree");
 const content = document.getElementById("content");
 const banner = document.getElementById("banner");
+const welcome = document.getElementById("welcome");
 
 // The document is rendered in a shadow root: its style sheet cannot leak
 // into the interface and vice versa.
@@ -68,7 +69,7 @@ function findNode(path) {
 
 // Expands every ancestor folder of `path` so that it becomes visible.
 async function reveal(path) {
-  if (!path.startsWith(session.root + session.separator)) return;
+  if (!session.root || !path.startsWith(session.root + session.separator)) return;
   const parts = path.slice(session.root.length + 1).split(session.separator);
   let prefix = session.root;
   for (const part of parts.slice(0, -1)) {
@@ -253,6 +254,76 @@ shadow.addEventListener("click", async (event) => {
   }
 });
 
+// ---------------------------------------------------------------- opening
+
+// Shows a folder, and opens a file in it if any. Without a folder, shows
+// the welcome page.
+async function start(next) {
+  session = next;
+  current = null;
+  selected = null;
+  banner.hidden = true;
+  welcome.hidden = session.root !== null;
+  document.body.classList.toggle("welcome", session.root === null);
+  if (!session.root) {
+    article.replaceChildren();
+    tree.replaceChildren();
+    document.getElementById("open-file").focus();
+    return;
+  }
+  document.getElementById("root-name").textContent = session.root_name;
+  tree.dataset.path = session.root;
+  await fillList(tree, session.root, 0);
+
+  if (session.initial) {
+    await reveal(session.initial);
+    await openFile(session.initial);
+    content.focus();
+  } else {
+    showMessage("Select a Markdown file in the tree.");
+    moveSelection(0);
+    tree.focus();
+  }
+}
+
+async function openPath(path) {
+  const next = await invoke("open_path", { path });
+  // A file of the opened folder keeps the state of the tree.
+  if (next.root === session.root && next.initial) {
+    await openFile(next.initial);
+    await reveal(current);
+    content.focus();
+  } else {
+    await start(next);
+  }
+}
+
+// Native file dialogs are modal: only one at a time.
+let picking = false;
+
+async function pick(folder) {
+  if (picking) return;
+  picking = true;
+  try {
+    const path = await invoke("pick", { folder });
+    if (path) await openPath(path);
+  } catch (err) {
+    showMessage(String(err));
+  } finally {
+    picking = false;
+  }
+}
+
+document.getElementById("open-file").addEventListener("click", () => pick(false));
+document.getElementById("open-folder").addEventListener("click", () => pick(true));
+
+// Items of the File menu, whose shortcuts (Ctrl+O, Ctrl+Shift+O) are
+// handled by the menu itself.
+listen("menu", (event) => {
+  if (event.payload === "open-file") pick(false);
+  else if (event.payload === "open-folder") pick(true);
+});
+
 // ---------------------------------------------------------------- global keys
 
 // Vim-like scrolling of the document.
@@ -278,6 +349,8 @@ function toggleSidebar() {
 }
 
 document.addEventListener("keydown", (event) => {
+  // The welcome page only has its buttons.
+  if (!session?.root) return;
   const ctrl = event.ctrlKey || event.metaKey;
   if (event.key === "Tab" && !ctrl && !event.altKey) {
     if (document.activeElement === tree || document.body.classList.contains("no-sidebar")) content.focus();
@@ -299,19 +372,6 @@ document.addEventListener("keydown", (event) => {
 // ---------------------------------------------------------------- startup
 
 (async () => {
-  session = await invoke("session");
   await loadUserStyle();
-  document.getElementById("root-name").textContent = session.root_name;
-  tree.dataset.path = session.root;
-  await fillList(tree, session.root, 0);
-
-  if (session.initial) {
-    await reveal(session.initial);
-    await openFile(session.initial);
-    content.focus();
-  } else {
-    showMessage("Select a Markdown file in the tree.");
-    moveSelection(0);
-    tree.focus();
-  }
+  await start(await invoke("session"));
 })().catch((err) => showMessage(String(err)));
