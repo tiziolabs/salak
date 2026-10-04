@@ -34,8 +34,8 @@ pub fn read(path: &Path) -> Result<Option<String>, String> {
 /// Real location of the style sheet, so that a symlink (e.g. into a
 /// dotfiles repository) is followed. `None` when its folder does not exist.
 pub fn watch_target(path: &Path) -> Option<PathBuf> {
-    path.canonicalize().ok().or_else(|| {
-        let dir = path.parent()?.canonicalize().ok()?;
+    dunce::canonicalize(path).ok().or_else(|| {
+        let dir = dunce::canonicalize(path.parent()?).ok()?;
         Some(dir.join(path.file_name()?))
     })
 }

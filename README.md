@@ -98,6 +98,34 @@ and the icons. Its dependencies are taken from the libraries the binary links
 to, so it only installs on systems at least as recent as the build system:
 build it on the oldest release to support.
 
+### Windows installer
+
+The installer is built on Windows, with the Tauri CLI. Requirements:
+
+- [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/),
+  with the "Desktop development with C++" workload;
+- Rust, installed with [rustup](https://rustup.rs) (MSVC toolchain, the
+  default);
+- WebView2, already present on Windows 10 and 11.
+
+Then, in the repository:
+
+```powershell
+cargo install tauri-cli --version "^2" --locked
+cargo tauri build
+```
+
+The installer is written to `target\release\bundle\nsis\`, as
+`Salak_<version>_x64-setup.exe`. It installs Salak for the current user
+without administrator rights, adds it to the Start menu, offers it to open
+Markdown files, and downloads WebView2 if it is missing. The settings
+specific to Windows are in `tauri.windows.conf.json`.
+
+`target\release\salak.exe` also works on its own, without installing.
+
+The installer is not signed: Windows SmartScreen warns about it on first
+launch ("More info", then "Run anyway").
+
 ## sway
 
 Salak runs natively on Wayland. When it detects sway, i3 or Hyprland, it

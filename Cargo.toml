@@ -34,6 +34,9 @@ serde = { version = "1", features = ["derive"] }
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 ammonia = "4"
 notify = "8"
+# Canonical paths without the `\\?\` prefix of Windows, which the webview
+# and users would otherwise see.
+dunce = "1"
 tauri-plugin-dialog = "2"
 # Pure Rust regex engine: no dependency on the Oniguruma C library.
 syntect = { version = "5", optional = true, default-features = false, features = ["default-syntaxes", "html", "regex-fancy"] }

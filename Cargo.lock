@@ -2747,6 +2747,7 @@ name = "salak"
 version = "0.1.0"
 dependencies = [
  "ammonia",
+ "dunce",
  "notify",
  "pulldown-cmark",
  "serde",

@@ -19,8 +19,7 @@ pub fn is_markdown(path: &Path) -> bool {
 
 /// Canonicalizes `path` and makes sure it does not escape `root`.
 pub fn resolve_in_root(root: &Path, path: &str) -> Result<PathBuf, String> {
-    let resolved = Path::new(path)
-        .canonicalize()
+    let resolved = dunce::canonicalize(path)
         .map_err(|err| format!("{path}: {err}"))?;
     if resolved.starts_with(root) {
         Ok(resolved)

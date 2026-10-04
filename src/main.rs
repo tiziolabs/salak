@@ -86,8 +86,7 @@ async fn open_path(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<Session, String> {
-    let path = PathBuf::from(&path)
-        .canonicalize()
+    let path = dunce::canonicalize(&path)
         .map_err(|err| format!("{path}: {err}"))?;
     let mut root = state.root.lock().unwrap();
     let (new_root, file) = match root.as_deref() {
@@ -252,8 +251,7 @@ fn open_url(url: String) -> Result<(), String> {
 
 fn state_from_args(path: Option<PathBuf>, css: Option<PathBuf>) -> Result<AppState, String> {
     let canonicalize = |path: PathBuf| {
-        path.canonicalize()
-            .map_err(|err| format!("{}: {err}", path.display()))
+        dunce::canonicalize(&path).map_err(|err| format!("{}: {err}", path.display()))
     };
     // Without a path, the welcome page invites to open one.
     let (root, initial) = match path {

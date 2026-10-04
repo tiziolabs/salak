@@ -72,7 +72,7 @@ fn local_target<'u>(url: &'u str, base: &Path, root: &Path) -> Option<(PathBuf, 
         Some(from_root) => root.join(from_root),
         None => base.join(path),
     };
-    Some((path.canonicalize().unwrap_or(path), fragment))
+    Some((dunce::canonicalize(&path).unwrap_or(path), fragment))
 }
 
 fn has_scheme(url: &str) -> bool {
