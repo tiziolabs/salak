@@ -1,0 +1,146 @@
+/* Default style of rendered documents. It lives inside a shadow root, so it
+   only applies to the document and never to the rest of the interface. */
+
+:host {
+  --fg: #1f2328;
+  --muted: #59636e;
+  --bg: #ffffff;
+  --border: #d1d9e0;
+  --subtle-bg: #f6f8fa;
+  --code-bg: #eff1f3;
+  --link: #0969da;
+  --mark: #fff8c5;
+  color-scheme: light dark;
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --fg: #e6edf3;
+    --muted: #9198a1;
+    --bg: #0d1117;
+    --border: #3d444d;
+    --subtle-bg: #151b23;
+    --code-bg: #262c36;
+    --link: #4493f8;
+    --mark: #bb800926;
+  }
+}
+
+.markdown-body {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 40px 64px;
+  color: var(--fg);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif;
+  overflow-wrap: break-word;
+}
+
+.markdown-body > :first-child { margin-top: 0; }
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 1.5em 0 .6em;
+  font-weight: 600;
+  line-height: 1.25;
+  scroll-margin-top: 16px;
+}
+
+h1 { font-size: 2em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+h2 { font-size: 1.5em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.25em; }
+h4 { font-size: 1em; }
+h5 { font-size: .875em; }
+h6 { font-size: .85em; color: var(--muted); }
+
+p, blockquote, ul, ol, dl, table, pre, details { margin: 0 0 1em; }
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+ul, ol { padding-left: 2em; }
+li + li { margin-top: .25em; }
+li > ul, li > ol { margin-bottom: 0; }
+
+/* Task lists */
+li:has(> input[type="checkbox"]) { list-style: none; }
+li > input[type="checkbox"] { margin: 0 .35em 0 -1.4em; vertical-align: middle; }
+
+blockquote {
+  padding: 0 1em;
+  color: var(--muted);
+  border-left: .25em solid var(--border);
+}
+
+hr {
+  height: .25em;
+  margin: 1.5em 0;
+  border: 0;
+  background: var(--border);
+}
+
+img { max-width: 100%; }
+
+code, kbd, pre, samp {
+  font-family: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  font-size: .875em;
+}
+
+code {
+  padding: .15em .4em;
+  border-radius: 6px;
+  background: var(--code-bg);
+}
+
+pre {
+  padding: 16px;
+  overflow: auto;
+  line-height: 1.45;
+  border-radius: 6px;
+  background: var(--subtle-bg);
+}
+
+pre code {
+  padding: 0;
+  font-size: 1em;
+  background: transparent;
+}
+
+kbd {
+  padding: .1em .4em;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+}
+
+mark { background: var(--mark); color: inherit; }
+
+table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 6px 13px;
+  border: 1px solid var(--border);
+}
+
+th { font-weight: 600; }
+tr:nth-child(2n) { background: var(--subtle-bg); }
+
+.footnote-definition {
+  display: flex;
+  gap: .5em;
+  font-size: .875em;
+  color: var(--muted);
+}
+
+.footnote-definition > p { margin: 0; }
+
+.placeholder {
+  padding: 48px 0;
+  color: var(--muted);
+  text-align: center;
+}

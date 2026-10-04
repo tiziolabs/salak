@@ -4,7 +4,16 @@ const { invoke } = window.__TAURI__.core;
 
 const tree = document.getElementById("tree");
 const content = document.getElementById("content");
-const doc = document.getElementById("doc");
+
+// The document is rendered in a shadow root: its style sheet cannot leak
+// into the interface and vice versa.
+const shadow = document.getElementById("doc").attachShadow({ mode: "open" });
+const style = document.createElement("link");
+style.rel = "stylesheet";
+style.href = "markdown.css";
+const article = document.createElement("article");
+article.className = "markdown-body";
+shadow.append(style, article);
 
 let session = null;
 let current = null;
@@ -53,7 +62,7 @@ function findNode(path) {
   return tree.querySelector(`li[data-path="${CSS.escape(path)}"]`);
 }
 
-/// Expands every ancestor folder of `path` so that it becomes visible.
+// Expands every ancestor folder of `path` so that it becomes visible.
 async function reveal(path) {
   if (!path.startsWith(session.root + session.separator)) return;
   const parts = path.slice(session.root.length + 1).split(session.separator);
@@ -154,13 +163,71 @@ tree.addEventListener("keydown", async (event) => {
 
 // ---------------------------------------------------------------- document
 
-async function openFile(path) {
-  current = path;
-  markActive(path);
-  doc.textContent = path;
+const MARKDOWN_FILE = /\.(md|markdown|mdown|mkdn?)$/i;
+
+function showMessage(text) {
+  const p = document.createElement("p");
+  p.className = "placeholder";
+  p.textContent = text;
+  article.replaceChildren(p);
 }
 
+function scrollToId(id) {
+  article.querySelector(`[id="${CSS.escape(id)}"]`)?.scrollIntoView();
+}
+
+async function openFile(path, fragment = "") {
+  try {
+    const result = await invoke("open_file", { path });
+    current = result.path;
+    // Parsing in a <template> does not start image loads before insertion.
+    const template = document.createElement("template");
+    template.innerHTML = result.html;
+    article.replaceChildren(template.content);
+    markActive(current);
+    content.scrollTop = 0;
+    if (fragment) scrollToId(decodeURIComponent(fragment));
+  } catch (err) {
+    showMessage(String(err));
+  }
+}
+
+shadow.addEventListener("click", async (event) => {
+  const link = event.target.closest("a[href]");
+  if (!link) return;
+  event.preventDefault();
+  const href = link.getAttribute("href");
+
+  if (href.startsWith("#")) {
+    scrollToId(decodeURIComponent(href.slice(1)));
+  } else if (href.startsWith("salak:")) {
+    const hash = href.indexOf("#");
+    const path = decodeURIComponent(href.slice(6, hash < 0 ? undefined : hash));
+    if (!MARKDOWN_FILE.test(path)) return;
+    await openFile(path, hash < 0 ? "" : href.slice(hash + 1));
+    await reveal(current);
+  } else {
+    invoke("open_url", { url: href }).catch(console.error);
+  }
+});
+
 // ---------------------------------------------------------------- global keys
+
+// Vim-like scrolling of the document.
+function scrollContent(key) {
+  const page = content.clientHeight;
+  const moves = {
+    j: () => content.scrollBy(0, 48),
+    k: () => content.scrollBy(0, -48),
+    d: () => content.scrollBy(0, page / 2),
+    u: () => content.scrollBy(0, -page / 2),
+    g: () => content.scrollTo(0, 0),
+    G: () => content.scrollTo(0, content.scrollHeight),
+  };
+  if (!(key in moves)) return false;
+  moves[key]();
+  return true;
+}
 
 function toggleSidebar() {
   document.body.classList.toggle("no-sidebar");
@@ -175,6 +242,8 @@ document.addEventListener("keydown", (event) => {
     else tree.focus();
   } else if (event.key === "b" && !event.altKey) {
     toggleSidebar();
+  } else if (content.contains(document.activeElement) && !ctrl && !event.altKey && scrollContent(event.key)) {
+    // Handled.
   } else {
     return;
   }
@@ -194,10 +263,8 @@ document.addEventListener("keydown", (event) => {
     await openFile(session.initial);
     content.focus();
   } else {
-    doc.innerHTML = '<p class="placeholder">Select a Markdown file in the tree.</p>';
+    showMessage("Select a Markdown file in the tree.");
     moveSelection(0);
     tree.focus();
   }
-})().catch((err) => {
-  doc.textContent = String(err);
-});
+})().catch((err) => showMessage(String(err)));

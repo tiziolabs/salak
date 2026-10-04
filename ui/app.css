@@ -128,9 +128,3 @@ body.no-sidebar #sidebar { display: none; }
   color: var(--fg);
   cursor: pointer;
 }
-
-.placeholder {
-  padding: 48px;
-  color: var(--muted);
-  text-align: center;
-}

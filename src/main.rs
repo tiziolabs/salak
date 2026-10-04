@@ -2,11 +2,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod files;
+mod render;
 
 use std::path::{PathBuf, MAIN_SEPARATOR};
+use std::process::Command;
 
 use serde::Serialize;
-use tauri::{State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 struct AppState {
     /// Folder shown in the tree. Every file access is confined to it.
@@ -40,10 +42,68 @@ fn session(state: State<AppState>) -> Session {
     }
 }
 
+#[derive(Serialize)]
+struct Document {
+    /// Canonical path, which may differ from the requested one.
+    path: String,
+    html: String,
+}
+
+// Commands are async so that file system access never blocks the UI thread.
+
 #[tauri::command]
-fn list_dir(state: State<AppState>, path: String) -> Result<Vec<files::Entry>, String> {
+async fn list_dir(state: State<'_, AppState>, path: String) -> Result<Vec<files::Entry>, String> {
     let dir = files::resolve_in_root(&state.root, &path)?;
     files::list_dir(&dir)
+}
+
+#[tauri::command]
+async fn open_file(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<Document, String> {
+    let file = files::resolve_in_root(&state.root, &path)?;
+    let bytes = std::fs::read(&file).map_err(|err| format!("{path}: {err}"))?;
+    let html = render::render(&String::from_utf8_lossy(&bytes), &file, &state.root);
+
+    // Shown by sway in the title bar / tab of the container.
+    if let Some(name) = file.file_name() {
+        let _ = window.set_title(&format!("{} - Salak", name.to_string_lossy()));
+    }
+    Ok(Document {
+        path: file.to_string_lossy().into_owned(),
+        html,
+    })
+}
+
+fn browser_command() -> Command {
+    #[cfg(windows)]
+    {
+        let mut command = Command::new("rundll32");
+        command.arg("url.dll,FileProtocolHandler");
+        command
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        Command::new("xdg-open")
+    }
+}
+
+/// Opens a web link in the default browser.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !["http://", "https://", "mailto:"].iter().any(|scheme| url.starts_with(scheme)) {
+        return Err(format!("{url}: unsupported link"));
+    }
+    let mut child = browser_command().arg(&url).spawn().map_err(|err| err.to_string())?;
+    // Reap the process so it does not linger as a zombie.
+    std::thread::spawn(move || child.wait());
+    Ok(())
 }
 
 /// `salak [PATH]`: PATH is a folder to browse or a file to open (its folder
@@ -80,8 +140,12 @@ fn main() {
 
     tauri::Builder::default()
         .manage(state)
-        .invoke_handler(tauri::generate_handler![session, list_dir])
+        .invoke_handler(tauri::generate_handler![session, list_dir, open_file, open_url])
         .setup(|app| {
+            // Lets the webview load images located in the opened folder.
+            let root = app.state::<AppState>().root.clone();
+            app.asset_protocol_scope().allow_directory(&root, true)?;
+
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("Salak")
                 .inner_size(1000.0, 700.0)

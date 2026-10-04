@@ -9,8 +9,10 @@ rust-version = "1.77"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+ammonia = "4"
 
 [features]
 # Embed the `ui/` assets in the binary so a plain `cargo build` produces a
