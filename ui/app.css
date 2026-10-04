@@ -123,6 +123,9 @@ body.no-sidebar #sidebar { display: none; }
   border-bottom: 1px solid var(--banner-border);
 }
 
+/* `display: flex` above would otherwise override the `hidden` attribute. */
+#banner[hidden] { display: none; }
+
 #banner button {
   font: inherit;
   padding: 2px 10px;
