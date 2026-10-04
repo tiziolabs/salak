@@ -150,6 +150,26 @@ struct Document {
     html: String,
 }
 
+/// Help pages, embedded in the binary: name, title, Markdown.
+const HELP: &[(&str, &str, &str)] = &[
+    ("user-guide", "User Guide", include_str!("../docs/help/user-guide.md")),
+    ("theming", "Theming Guide", include_str!("../docs/help/theming.md")),
+];
+
+#[tauri::command]
+fn open_help(window: WebviewWindow, name: String) -> Result<Document, String> {
+    let (_, title, markdown) = HELP
+        .iter()
+        .find(|(id, ..)| *id == name)
+        .ok_or_else(|| format!("{name}: no such help page"))?;
+    let _ = window.set_title(&format!("{title} - Salak"));
+    Ok(Document {
+        // Help pages link to each other with `help:` URLs, not paths.
+        path: format!("help:{name}"),
+        html: render::render(markdown, Path::new(""), Path::new("")),
+    })
+}
+
 // Commands are async so that file system access never blocks the UI thread.
 
 #[tauri::command]
@@ -263,7 +283,16 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &MenuItem::with_id(app, "quit", "&Quit", true, Some("CmdOrCtrl+Q"))?,
         ],
     )?;
-    Menu::with_items(app, &[&file])
+    let help = Submenu::with_items(
+        app,
+        "&Help",
+        true,
+        &[
+            &MenuItem::with_id(app, "help:user-guide", "&User Guide", true, Some("F1"))?,
+            &MenuItem::with_id(app, "help:theming", "&Theming Guide", true, None::<&str>)?,
+        ],
+    )?;
+    Menu::with_items(app, &[&file, &help])
 }
 
 /// Tiling compositors (sway, i3, Hyprland) manage window chrome themselves:
@@ -299,7 +328,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
-            session, list_dir, open_file, open_path, pick, open_url, user_style
+            session, list_dir, open_file, open_path, pick, open_help, open_url, user_style
         ])
         .setup(|app| {
             // Lets the webview load images located in the opened folder.

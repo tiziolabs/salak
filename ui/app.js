@@ -181,18 +181,35 @@ function scrollToId(id) {
   article.querySelector(`[id="${CSS.escape(id)}"]`)?.scrollIntoView();
 }
 
+function showDocument(doc, fragment) {
+  current = doc.path;
+  banner.hidden = true;
+  // Parsing in a <template> does not start image loads before insertion.
+  const template = document.createElement("template");
+  template.innerHTML = doc.html;
+  article.replaceChildren(template.content);
+  markActive(current);
+  content.scrollTop = 0;
+  if (fragment) scrollToId(decodeURIComponent(fragment));
+}
+
 async function openFile(path, fragment = "") {
   try {
-    const result = await invoke("open_file", { path });
-    current = result.path;
-    banner.hidden = true;
-    // Parsing in a <template> does not start image loads before insertion.
-    const template = document.createElement("template");
-    template.innerHTML = result.html;
-    article.replaceChildren(template.content);
-    markActive(current);
-    content.scrollTop = 0;
-    if (fragment) scrollToId(decodeURIComponent(fragment));
+    showDocument(await invoke("open_file", { path }), fragment);
+  } catch (err) {
+    showMessage(String(err));
+  }
+}
+
+// Help pages are embedded in the binary. Without a folder, they replace the
+// welcome page until `Esc`.
+async function openHelp(name) {
+  try {
+    const doc = await invoke("open_help", { name });
+    welcome.hidden = true;
+    document.body.classList.remove("welcome");
+    showDocument(doc);
+    content.focus();
   } catch (err) {
     showMessage(String(err));
   }
@@ -201,7 +218,8 @@ async function openFile(path, fragment = "") {
 async function reload() {
   if (!current) return;
   const top = content.scrollTop;
-  await openFile(current);
+  if (current.startsWith("help:")) await openHelp(current.slice(5));
+  else await openFile(current);
   content.scrollTop = top;
 }
 
@@ -243,6 +261,8 @@ shadow.addEventListener("click", async (event) => {
 
   if (href.startsWith("#")) {
     scrollToId(decodeURIComponent(href.slice(1)));
+  } else if (href.startsWith("help:")) {
+    await openHelp(href.slice(5));
   } else if (href.startsWith("salak:")) {
     const hash = href.indexOf("#");
     const path = decodeURIComponent(href.slice(6, hash < 0 ? undefined : hash));
@@ -265,6 +285,7 @@ async function start(next) {
   banner.hidden = true;
   welcome.hidden = session.root !== null;
   document.body.classList.toggle("welcome", session.root === null);
+  document.body.classList.toggle("no-root", session.root === null);
   if (!session.root) {
     article.replaceChildren();
     tree.replaceChildren();
@@ -316,12 +337,17 @@ async function pick(folder) {
 
 document.getElementById("open-file").addEventListener("click", () => pick(false));
 document.getElementById("open-folder").addEventListener("click", () => pick(true));
+document.getElementById("open-guide").addEventListener("click", (event) => {
+  event.preventDefault();
+  openHelp("user-guide");
+});
 
-// Items of the File menu, whose shortcuts (Ctrl+O, Ctrl+Shift+O) are
-// handled by the menu itself.
+// Menu items, whose shortcuts (Ctrl+O, F1…) are handled by the menu itself.
 listen("menu", (event) => {
-  if (event.payload === "open-file") pick(false);
-  else if (event.payload === "open-folder") pick(true);
+  const id = event.payload;
+  if (id === "open-file") pick(false);
+  else if (id === "open-folder") pick(true);
+  else if (id.startsWith("help:")) openHelp(id.slice(5));
 });
 
 // ---------------------------------------------------------------- global keys
@@ -350,7 +376,7 @@ function toggleSidebar() {
 
 document.addEventListener("keydown", (event) => {
   // The welcome page only has its buttons.
-  if (!session?.root) return;
+  if (!welcome.hidden) return;
   const ctrl = event.ctrlKey || event.metaKey;
   if (event.key === "Tab" && !ctrl && !event.altKey) {
     if (document.activeElement === tree || document.body.classList.contains("no-sidebar")) content.focus();
@@ -359,6 +385,8 @@ document.addEventListener("keydown", (event) => {
     reload();
   } else if (event.key === "Escape" && !banner.hidden) {
     banner.hidden = true;
+  } else if (event.key === "Escape" && !session.root) {
+    start(session);
   } else if (event.key === "b" && !event.altKey) {
     toggleSidebar();
   } else if (content.contains(document.activeElement) && !ctrl && !event.altKey && scrollContent(event.key)) {

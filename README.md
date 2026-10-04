@@ -32,6 +32,7 @@ salak --css dark.css  # use another style sheet
 | `Ctrl+O` | Open a file |
 | `Ctrl+Shift+O` | Open a folder |
 | `Ctrl+Q` | Quit |
+| `F1` | Show the user guide |
 | `Tab` | Switch focus between the tree and the document |
 | `↑` `↓` / `j` `k` | Move in the tree, scroll the document |
 | `←` `→` / `h` `l` | Collapse / expand a folder |
@@ -44,68 +45,13 @@ salak --css dark.css  # use another style sheet
 
 ## Custom style
 
-Salak looks for a style sheet in:
+Salak applies a user style sheet on top of its default style, and reloads it
+live at every save: `~/.config/salak/style.css` on Linux (honoring
+`$XDG_CONFIG_HOME`), `%APPDATA%\salak\style.css` on Windows, or the file
+given with `--css FILE`.
 
-- `$XDG_CONFIG_HOME/salak/style.css`, so `~/.config/salak/style.css` by
-  default, on Linux;
-- `%APPDATA%\salak\style.css` on Windows;
-- or the file given with `--css FILE`.
-
-It is applied on top of the default style, which it can override with plain
-CSS, and reloaded as soon as it is saved. It only affects the document, never
-the file tree. Symlinks are followed, so the file can live in a dotfiles
-repository.
-
-The quickest way to make a theme is to override the variables of the default
-style:
-
-```css
-:host {
-  --fg: #cdd6f4;        /* text */
-  --muted: #a6adc8;     /* quotes, footnotes */
-  --bg: #1e1e2e;        /* background */
-  --border: #45475a;    /* rules, tables, headings */
-  --subtle-bg: #181825; /* code blocks, table stripes */
-  --code-bg: #313244;   /* inline code */
-  --link: #89b4fa;
-  --mark: #f9e2af40;
-}
-```
-
-Any element of the document can also be targeted directly:
-
-```css
-.markdown-body {
-  max-width: 72ch;
-  font-family: "Iosevka Aile", sans-serif;
-}
-
-h1, h2 { border-bottom: none; }
-```
-
-Fonts must be installed on the system: for security, the style sheet cannot
-load resources from the network.
-
-Code blocks are highlighted with classes named after the scopes of the
-language grammars: `keyword.control.shell` gives `hl-keyword hl-control
-hl-shell`. Their colors are variables too:
-
-```css
-:host {
-  --hl-comment: #6c7086;
-  --hl-keyword: #cba6f7;
-  --hl-string: #a6e3a1;
-  --hl-constant: #fab387;   /* numbers, options like `-y` */
-  --hl-function: #89b4fa;   /* functions, shell commands */
-  --hl-type: #f9e2af;
-  --hl-variable: #f38ba8;
-  --hl-tag: #94e2d5;        /* HTML tags, Markdown headings */
-  --hl-inserted: #a6e3a1;   /* diffs */
-  --hl-deleted: #f38ba8;
-}
-
-.hl-comment { font-style: normal; }
-```
+The [theming guide](docs/help/theming.md), also in the **Help** menu, explains
+how to make a theme: colors, light and dark modes, code highlighting, fonts.
 
 ## Building
 
@@ -157,10 +103,6 @@ Markdown files may contain raw HTML. Salak sanitizes the rendered HTML with
 [ammonia](https://crates.io/crates/ammonia), forbids scripts through a
 Content Security Policy, and only gives access to files inside the opened
 folder.
-
-## Roadmap
-
-- Syntax highlighting of code blocks.
 
 ## License
 

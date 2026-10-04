@@ -43,7 +43,7 @@ body {
 }
 
 body.no-sidebar #sidebar,
-body.welcome #sidebar,
+body.no-root #sidebar,
 body.welcome #content { display: none; }
 
 #sidebar {
@@ -163,6 +163,13 @@ body.welcome #content { display: none; }
   margin: 0 0 20px;
   color: var(--muted);
 }
+
+#welcome p.hint {
+  margin: 24px 0 0;
+  font-size: 13px;
+}
+
+#welcome a { color: var(--accent); }
 
 #welcome .actions {
   display: flex;

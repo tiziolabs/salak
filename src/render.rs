@@ -162,7 +162,7 @@ fn slugify(text: &str) -> String {
 fn sanitizer() -> ammonia::Builder<'static> {
     let mut builder = ammonia::Builder::default();
     builder
-        .add_url_schemes(&["salak", "asset"])
+        .add_url_schemes(&["salak", "asset", "help"])
         // Task lists.
         .add_tags(&["input"])
         .add_tag_attributes("input", &["type", "checked", "disabled"])
@@ -244,6 +244,12 @@ mod tests {
         assert!(html.contains("<span class=\"hl-comment"), "{html}");
         assert!(html.contains("&lt;hi&gt;"), "{html}");
         assert!(html.contains("<code class=\"language-nope\">&lt;b&gt;x&lt;/b&gt;"), "{html}");
+    }
+
+    #[test]
+    fn keeps_help_links() {
+        let html = render_in("[guide](help:theming)");
+        assert!(html.contains("href=\"help:theming\""), "{html}");
     }
 
     #[test]
