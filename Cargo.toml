@@ -5,6 +5,25 @@ description = "A lightweight Markdown reader"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 rust-version = "1.77"
+authors = ["Timothe Tizio <t.tizio@mailbox.org>"]
+
+# `cargo deb` builds a Debian package in target/debian/.
+[package.metadata.deb]
+section = "text"
+extended-description = """\
+Salak shows the Markdown files of a folder in a tree, and renders the selected \
+one: tables, footnotes, task lists and highlighted code blocks, in light and \
+dark themes. It reloads files changed on disk and applies a user style sheet."""
+# Shared libraries (WebKitGTK, GTK…) are found by dpkg-shlibdeps.
+depends = "$auto"
+assets = [
+    ["target/release/salak", "usr/bin/", "755"],
+    ["packaging/salak.desktop", "usr/share/applications/", "644"],
+    ["icons/128x128.png", "usr/share/icons/hicolor/128x128/apps/salak.png", "644"],
+    ["icons/icon.png", "usr/share/icons/hicolor/512x512/apps/salak.png", "644"],
+    ["icons/salak.svg", "usr/share/icons/hicolor/scalable/apps/salak.svg", "644"],
+    ["README.md", "usr/share/doc/salak/", "644"],
+]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -80,6 +80,21 @@ cargo build --release --no-default-features --features custom-protocol
 
 Run the tests with `cargo test`.
 
+### Debian package
+
+With [cargo-deb](https://crates.io/crates/cargo-deb):
+
+```sh
+cargo install cargo-deb
+cargo deb
+sudo apt install ./target/debian/salak_*.deb
+```
+
+The package installs the binary, a desktop entry that opens Markdown files,
+and the icons. Its dependencies are taken from the libraries the binary links
+to, so it only installs on systems at least as recent as the build system:
+build it on the oldest release to support.
+
 ## sway
 
 Salak runs natively on Wayland. When it detects sway, i3 or Hyprland, it
