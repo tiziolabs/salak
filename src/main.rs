@@ -71,7 +71,7 @@ async fn open_file(
     let bytes = std::fs::read(&file).map_err(|err| format!("{path}: {err}"))?;
     let html = render::render(&String::from_utf8_lossy(&bytes), &file, &state.root);
 
-    let watcher = watch::watch(window.app_handle().clone(), file.clone())
+    let watcher = watch::watch(window.app_handle().clone(), file.clone(), "file-changed")
         .map_err(|err| eprintln!("salak: cannot watch {}: {err}", file.display()))
         .ok();
     *state.watcher.lock().unwrap() = watcher;
