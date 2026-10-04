@@ -5,6 +5,7 @@ A lightweight, read-only Markdown reader for the desktop.
 - File tree of a folder, IDE style, loaded lazily.
 - GitHub-like rendering: tables, footnotes, task lists, strikethrough.
 - Light and dark themes, following the system preference.
+- Custom style sheet, applied live while you edit it.
 - Watches the opened file and offers to reload it when it changes.
 - Keyboard driven, designed to fit tiling window managers such as sway.
 
@@ -18,6 +19,7 @@ plain HTML, CSS and JavaScript, with no framework, no bundler and no npm.
 salak                 # browse the current directory
 salak ~/notes         # browse a folder
 salak README.md       # open a file, browsing its folder
+salak --css dark.css  # use another style sheet
 ```
 
 ### Keys
@@ -33,6 +35,50 @@ salak README.md       # open a file, browsing its folder
 | `r`, `F5`, `Ctrl+R` | Reload the document |
 | `Esc` | Dismiss the "file changed" banner |
 | `b`, `Ctrl+B` | Toggle the sidebar |
+
+## Custom style
+
+Salak looks for a style sheet in:
+
+- `$XDG_CONFIG_HOME/salak/style.css`, so `~/.config/salak/style.css` by
+  default, on Linux;
+- `%APPDATA%\salak\style.css` on Windows;
+- or the file given with `--css FILE`.
+
+It is applied on top of the default style, which it can override with plain
+CSS, and reloaded as soon as it is saved. It only affects the document, never
+the file tree. Symlinks are followed, so the file can live in a dotfiles
+repository.
+
+The quickest way to make a theme is to override the variables of the default
+style:
+
+```css
+:host {
+  --fg: #cdd6f4;        /* text */
+  --muted: #a6adc8;     /* quotes, footnotes */
+  --bg: #1e1e2e;        /* background */
+  --border: #45475a;    /* rules, tables, headings */
+  --subtle-bg: #181825; /* code blocks, table stripes */
+  --code-bg: #313244;   /* inline code */
+  --link: #89b4fa;
+  --mark: #f9e2af40;
+}
+```
+
+Any element of the document can also be targeted directly:
+
+```css
+.markdown-body {
+  max-width: 72ch;
+  font-family: "Iosevka Aile", sans-serif;
+}
+
+h1, h2 { border-bottom: none; }
+```
+
+Fonts must be installed on the system: for security, the style sheet cannot
+load resources from the network.
 
 ## Building
 
@@ -80,9 +126,6 @@ folder.
 
 ## Roadmap
 
-- Custom style sheet, overriding or replacing the default one, read from
-  `$XDG_CONFIG_HOME/salak/style.css` (`~/.config/salak/style.css` by default)
-  on Linux and `%APPDATA%\salak\style.css` on Windows.
 - Syntax highlighting of code blocks.
 
 ## License
