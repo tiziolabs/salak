@@ -103,9 +103,13 @@ body.no-sidebar #sidebar { display: none; }
 
 #content {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
   outline: none;
 }
+
+#doc { flex: 1 0 auto; }
 
 #banner {
   position: sticky;

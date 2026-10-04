@@ -1,5 +1,7 @@
 /* Default style of rendered documents. It lives inside a shadow root, so it
-   only applies to the document and never to the rest of the interface. */
+   only applies to the document and never to the rest of the interface.
+   A user style sheet is loaded after it: the variables below are the
+   simplest way to theme a document. */
 
 :host {
   --fg: #1f2328;
@@ -12,6 +14,7 @@
   --mark: #fff8c5;
   color-scheme: light dark;
   display: block;
+  background: var(--bg);
 }
 
 @media (prefers-color-scheme: dark) {

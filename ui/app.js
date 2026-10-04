@@ -13,9 +13,11 @@ const shadow = document.getElementById("doc").attachShadow({ mode: "open" });
 const style = document.createElement("link");
 style.rel = "stylesheet";
 style.href = "markdown.css";
+// Comes after the default style sheet, so it wins at equal specificity.
+const userStyle = document.createElement("style");
 const article = document.createElement("article");
 article.className = "markdown-body";
-shadow.append(style, article);
+shadow.append(style, userStyle, article);
 
 let session = null;
 let current = null;
@@ -204,6 +206,17 @@ async function reload() {
 
 // ---------------------------------------------------------------- changes
 
+async function loadUserStyle() {
+  try {
+    userStyle.textContent = (await invoke("user_style")) ?? "";
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// Applied right away: no banner, so that a theme can be tuned live.
+listen("style-changed", loadUserStyle);
+
 function showBanner() {
   const text = document.createElement("span");
   text.textContent = "This file has changed on disk.";
@@ -287,6 +300,7 @@ document.addEventListener("keydown", (event) => {
 
 (async () => {
   session = await invoke("session");
+  await loadUserStyle();
   document.getElementById("root-name").textContent = session.root_name;
   tree.dataset.path = session.root;
   await fillList(tree, session.root, 0);

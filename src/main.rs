@@ -1,8 +1,10 @@
 // Hide the console window on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cli;
 mod files;
 mod render;
+mod style;
 mod watch;
 
 use std::path::{PathBuf, MAIN_SEPARATOR};
@@ -17,8 +19,12 @@ struct AppState {
     root: PathBuf,
     /// File given on the command line, opened at startup.
     initial: Option<PathBuf>,
+    /// User style sheet. It may not exist (yet).
+    style: Option<PathBuf>,
     /// Watches the opened document. Replacing it stops the previous watch.
-    watcher: Mutex<Option<notify::RecommendedWatcher>>,
+    doc_watcher: Mutex<Option<notify::RecommendedWatcher>>,
+    /// Watches the user style sheet, for live editing of themes.
+    style_watcher: Mutex<Option<notify::RecommendedWatcher>>,
 }
 
 #[derive(Serialize)]
@@ -74,7 +80,7 @@ async fn open_file(
     let watcher = watch::watch(window.app_handle().clone(), file.clone(), "file-changed")
         .map_err(|err| eprintln!("salak: cannot watch {}: {err}", file.display()))
         .ok();
-    *state.watcher.lock().unwrap() = watcher;
+    *state.doc_watcher.lock().unwrap() = watcher;
 
     // Shown by sway in the title bar / tab of the container.
     if let Some(name) = file.file_name() {
@@ -84,6 +90,14 @@ async fn open_file(
         path: file.to_string_lossy().into_owned(),
         html,
     })
+}
+
+#[tauri::command]
+async fn user_style(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    match &state.style {
+        Some(path) => style::read(path),
+        None => Ok(None),
+    }
 }
 
 fn browser_command() -> Command {
@@ -115,19 +129,30 @@ fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
-/// `salak [PATH]`: PATH is a folder to browse or a file to open (its folder
-/// is then browsed). Defaults to the current directory.
-fn parse_args() -> Result<AppState, String> {
-    let arg = std::env::args_os().nth(1).unwrap_or_else(|| ".".into());
-    let path = PathBuf::from(&arg)
-        .canonicalize()
-        .map_err(|err| format!("{}: {err}", PathBuf::from(&arg).display()))?;
-    if path.is_dir() {
-        Ok(AppState { root: path, initial: None, watcher: Mutex::default() })
+fn state_from_args(path: Option<PathBuf>, css: Option<PathBuf>) -> Result<AppState, String> {
+    let canonicalize = |path: PathBuf| {
+        path.canonicalize()
+            .map_err(|err| format!("{}: {err}", path.display()))
+    };
+    let path = canonicalize(path.unwrap_or_else(|| ".".into()))?;
+    let (root, initial) = if path.is_dir() {
+        (path, None)
     } else {
         let root = path.parent().map(PathBuf::from).unwrap_or_else(|| path.clone());
-        Ok(AppState { root, initial: Some(path), watcher: Mutex::default() })
-    }
+        (root, Some(path))
+    };
+    // An explicit style sheet must exist, the default one is optional.
+    let style = match css {
+        Some(css) => Some(canonicalize(css)?),
+        None => style::default_path(),
+    };
+    Ok(AppState {
+        root,
+        initial,
+        style,
+        doc_watcher: Mutex::default(),
+        style_watcher: Mutex::default(),
+    })
 }
 
 /// Tiling compositors (sway, i3, Hyprland) manage window chrome themselves:
@@ -139,21 +164,44 @@ fn under_tiling_wm() -> bool {
 }
 
 fn main() {
-    let state = match parse_args() {
+    let state = match cli::parse(std::env::args_os().skip(1)) {
+        Ok(cli::Command::Help) => {
+            println!("{}", cli::USAGE);
+            return;
+        }
+        Ok(cli::Command::Version) => {
+            println!("salak {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
+        Ok(cli::Command::Run { path, css }) => state_from_args(path, css),
+        Err(err) => Err(format!("{err}\n\n{}", cli::USAGE)),
+    };
+    let state = match state {
         Ok(state) => state,
         Err(err) => {
             eprintln!("salak: {err}");
-            std::process::exit(1);
+            std::process::exit(2);
         }
     };
 
     tauri::Builder::default()
         .manage(state)
-        .invoke_handler(tauri::generate_handler![session, list_dir, open_file, open_url])
+        .invoke_handler(tauri::generate_handler![
+            session, list_dir, open_file, open_url, user_style
+        ])
         .setup(|app| {
             // Lets the webview load images located in the opened folder.
             let root = app.state::<AppState>().root.clone();
             app.asset_protocol_scope().allow_directory(&root, true)?;
+
+            // Without its folder, live reload starts with the next launch.
+            let state = app.state::<AppState>();
+            if let Some(target) = state.style.as_deref().and_then(style::watch_target) {
+                let watcher = watch::watch(app.handle().clone(), target, "style-changed")
+                    .map_err(|err| eprintln!("salak: cannot watch the style sheet: {err}"))
+                    .ok();
+                *state.style_watcher.lock().unwrap() = watcher;
+            }
 
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("Salak")
