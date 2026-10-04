@@ -6,6 +6,7 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 rust-version = "1.77"
 authors = ["Timothe Tizio <t.tizio@mailbox.org>"]
+repository = "https://github.com/tiziolabs/salak"
 
 # `cargo deb` builds a Debian package in target/debian/.
 [package.metadata.deb]

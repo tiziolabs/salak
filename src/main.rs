@@ -151,6 +151,28 @@ struct Document {
     html: String,
 }
 
+/// Shown by Help › About Salak, from the package metadata.
+#[derive(Serialize)]
+struct About {
+    version: &'static str,
+    license: &'static str,
+    author: String,
+    repository: &'static str,
+}
+
+#[tauri::command]
+fn about() -> About {
+    // `Name <email>`: only the name is shown.
+    let authors = env!("CARGO_PKG_AUTHORS");
+    let author = authors.split(':').next().unwrap_or_default();
+    About {
+        version: env!("CARGO_PKG_VERSION"),
+        license: env!("CARGO_PKG_LICENSE"),
+        author: author.split(" <").next().unwrap_or_default().to_string(),
+        repository: env!("CARGO_PKG_REPOSITORY"),
+    }
+}
+
 /// Help pages, embedded in the binary: name, title, Markdown.
 const HELP: &[(&str, &str, &str)] = &[
     ("user-guide", "User Guide", include_str!("../docs/help/user-guide.md")),
@@ -301,6 +323,8 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &[
             &MenuItem::with_id(app, "help:user-guide", "&User Guide", true, Some("F1"))?,
             &MenuItem::with_id(app, "help:theming", "&Theming Guide", true, None::<&str>)?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "about", "&About Salak", true, None::<&str>)?,
         ],
     )?;
     Menu::with_items(app, &[&file, &help])
@@ -346,6 +370,7 @@ fn main() {
             open_path,
             pick,
             open_help,
+            about,
             open_url,
             user_style
         ])

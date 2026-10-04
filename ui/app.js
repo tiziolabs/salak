@@ -541,12 +541,43 @@ function openHelp(name) {
   openTab(`help:${name}`).then(() => content.focus());
 }
 
+// ---------------------------------------------------------------- about
+
+const aboutDialog = document.getElementById("about");
+
+async function showAbout() {
+  if (aboutDialog.open) return;
+  try {
+    const about = await invoke("about");
+    document.getElementById("about-version").textContent = about.version;
+    document.getElementById("about-license").textContent = about.license.replaceAll(" OR ", " or ");
+    document.getElementById("about-author").textContent = about.author;
+    const link = document.getElementById("about-repository");
+    link.href = about.repository;
+    link.textContent = about.repository.replace(/^https:\/\//, "");
+    aboutDialog.showModal();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+document.getElementById("about-repository").addEventListener("click", (event) => {
+  event.preventDefault();
+  invoke("open_url", { url: event.currentTarget.href }).catch(console.error);
+});
+
+// A click on the backdrop, outside of the dialog box, closes it.
+aboutDialog.addEventListener("click", (event) => {
+  if (event.target === aboutDialog) aboutDialog.close();
+});
+
 // Menu items, whose shortcuts (Ctrl+O, F1…) are handled by the menu itself.
 listen("menu", (event) => {
   const id = event.payload;
   if (id === "open-file") pick(false);
   else if (id === "open-folder") pick(true);
   else if (id === "close-tab" && active) closeTabs([active]);
+  else if (id === "about") showAbout();
   else if (id.startsWith("help:")) openHelp(id.slice(5));
 });
 
@@ -582,8 +613,8 @@ function toggleSidebar() {
 for (const button of sidebarToggles) button.addEventListener("click", toggleSidebar);
 
 document.addEventListener("keydown", (event) => {
-  // The welcome page only has its buttons.
-  if (!welcome.hidden) return;
+  // The welcome page and the about dialog only have their buttons.
+  if (!welcome.hidden || aboutDialog.open) return;
   const ctrl = event.ctrlKey || event.metaKey;
   if (!tabMenu.hidden) {
     if (event.key === "Escape") hideTabMenu(true);

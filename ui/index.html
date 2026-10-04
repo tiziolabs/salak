@@ -45,6 +45,18 @@
       <div id="doc"></div>
     </main>
   </div>
+  <dialog id="about" aria-labelledby="about-name">
+    <img src="logo.svg" alt="" width="72" height="72">
+    <h2 id="about-name">Salak</h2>
+    <p class="tagline">A lightweight Markdown reader</p>
+    <dl>
+      <dt>Version</dt><dd id="about-version"></dd>
+      <dt>License</dt><dd id="about-license"></dd>
+      <dt>Developer</dt><dd id="about-author"></dd>
+      <dt>Source</dt><dd><a id="about-repository" href=""></a></dd>
+    </dl>
+    <form method="dialog"><button autofocus>Close</button></form>
+  </dialog>
   <div id="tab-menu" role="menu" hidden>
     <button role="menuitem" data-action="close">Close This Tab</button>
     <button role="menuitem" data-action="close-others">Close Other Tabs</button>

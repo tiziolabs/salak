@@ -338,3 +338,52 @@ body.no-root #show-sidebar { display: none; }
   font: 12px ui-monospace, monospace;
   color: var(--muted);
 }
+
+#about {
+  width: 320px;
+  padding: 24px 24px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--fg);
+  text-align: center;
+  box-shadow: 0 8px 32px #0006;
+}
+
+#about::backdrop { background: #0005; }
+
+#about h2 {
+  margin: 12px 0 2px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+#about .tagline {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+#about dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0 0 20px;
+  text-align: left;
+}
+
+#about dt { color: var(--muted); }
+#about dd { margin: 0; overflow-wrap: anywhere; }
+#about a { color: var(--accent); }
+
+#about button {
+  font: inherit;
+  padding: 5px 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--sidebar-bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+#about button:hover { background: var(--hover); }
+#about button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
