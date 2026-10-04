@@ -16,6 +16,12 @@ Salak is built with [Tauri 2](https://tauri.app): a Rust backend and the
 system webview (WebKitGTK on Linux, WebView2 on Windows). The frontend is
 plain HTML, CSS and JavaScript, with no framework, no bundler and no npm.
 
+## Download
+
+The Debian package, the Windows installer and a portable Windows build are
+published on the [releases page](https://github.com/tiziolabs/salak/releases).
+Salak can also be built from source, see [Building](#building).
+
 ## Usage
 
 ```sh
@@ -82,6 +88,8 @@ cargo build --release --no-default-features --features custom-protocol
 ```
 
 Run the tests with `cargo test`.
+
+The release procedure is described in [RELEASING.md](RELEASING.md).
 
 ### Debian package
 
