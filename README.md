@@ -76,7 +76,7 @@ On Arch: `sudo pacman -S --needed base-devel webkit2gtk-4.1`.
 Then a plain Cargo build is enough, the Tauri CLI is not needed:
 
 ```sh
-cargo build --release
+cargo build --release -p salak-tauri
 ./target/release/salak
 ```
 
@@ -84,10 +84,10 @@ Syntax highlighting of code blocks is enabled by default. It adds about
 2 MB to the binary; to build without it:
 
 ```sh
-cargo build --release --no-default-features --features custom-protocol
+cargo build --release -p salak-tauri --no-default-features --features custom-protocol
 ```
 
-Run the tests with `cargo test`.
+Run the tests with `cargo test -p salak-tauri`.
 
 The release procedure is described in [RELEASING.md](RELEASING.md).
 
@@ -97,7 +97,7 @@ With [cargo-deb](https://crates.io/crates/cargo-deb):
 
 ```sh
 cargo install cargo-deb
-cargo deb
+cargo deb -p salak-tauri
 sudo apt install ./target/debian/salak_*.deb
 ```
 
@@ -120,6 +120,7 @@ Then, in the repository:
 
 ```powershell
 cargo install tauri-cli --version "^2" --locked
+cd crates/salak-tauri
 cargo tauri build
 ```
 

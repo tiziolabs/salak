@@ -9,12 +9,12 @@ A release publishes, on the GitHub page of the project:
 | `salak-<version>-windows-x64-portable.zip` | Windows, same script |
 | Source code (zip and tar.gz) | GitHub, from the tag |
 
-The version is only written in `Cargo.toml`: the Tauri configuration and the
+The version is only written in the root `Cargo.toml` (`[workspace.package]`): the Tauri configuration and the
 packages take it from there.
 
 ## 1. Prepare
 
-1. Set `version` in `Cargo.toml`, then run `cargo build` to update
+1. Set `version` in `[workspace.package]` of the root `Cargo.toml`, then run `cargo build -p salak-tauri` to update
    `Cargo.lock`.
 2. Replace `Unreleased` with the date in `CHANGELOG.md`.
 3. Commit, tag and push:
@@ -31,7 +31,7 @@ On Linux, preferably the oldest release to support (see the README):
 
 ```sh
 git checkout v0.1.0
-cargo deb
+cargo deb -p salak-tauri
 # → target/debian/salak_0.1.0-1_amd64.deb
 ```
 

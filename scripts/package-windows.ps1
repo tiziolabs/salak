@@ -6,10 +6,14 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot)
 
-$version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages[0].version
+$version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages | Where-Object name -eq "salak-tauri" | ForEach-Object version
 
+# The Tauri configuration lives in the salak-tauri crate; the target folder stays at the root.
+Push-Location crates\salak-tauri
 cargo tauri build
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$code = $LASTEXITCODE
+Pop-Location
+if ($code -ne 0) { exit $code }
 
 New-Item -ItemType Directory -Force dist | Out-Null
 Copy-Item "target\release\bundle\nsis\Salak_${version}_x64-setup.exe" dist

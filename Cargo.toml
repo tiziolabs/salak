@@ -1,56 +1,16 @@
-[package]
-name = "salak"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
-description = "A lightweight Markdown reader"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 rust-version = "1.77"
 authors = ["Timothe Tizio <t.tizio@mailbox.org>"]
 repository = "https://github.com/tiziolabs/salak"
 
-# `cargo deb` builds a Debian package in target/debian/.
-[package.metadata.deb]
-section = "text"
-extended-description = """\
-Salak shows the Markdown files of a folder in a tree, and renders the selected \
-one: tables, footnotes, task lists and highlighted code blocks, in light and \
-dark themes. It reloads files changed on disk and applies a user style sheet."""
-# Shared libraries (WebKitGTK, GTK…) are found by dpkg-shlibdeps.
-depends = "$auto"
-assets = [
-    ["target/release/salak", "usr/bin/", "755"],
-    ["packaging/salak.desktop", "usr/share/applications/", "644"],
-    ["icons/128x128.png", "usr/share/icons/hicolor/128x128/apps/salak.png", "644"],
-    ["icons/icon.png", "usr/share/icons/hicolor/512x512/apps/salak.png", "644"],
-    ["icons/salak.svg", "usr/share/icons/hicolor/scalable/apps/salak.svg", "644"],
-    ["README.md", "usr/share/doc/salak/", "644"],
-]
-
-[build-dependencies]
-tauri-build = { version = "2", features = [] }
-
-[dependencies]
-tauri = { version = "2", features = ["protocol-asset"] }
-serde = { version = "1", features = ["derive"] }
-pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
-ammonia = "4"
-notify = "8"
-# Canonical paths without the `\\?\` prefix of Windows, which the webview
-# and users would otherwise see.
-dunce = "1"
-tauri-plugin-dialog = "2"
-# Pure Rust regex engine: no dependency on the Oniguruma C library.
-syntect = { version = "5", optional = true, default-features = false, features = ["default-syntaxes", "html", "regex-fancy"] }
-
-[features]
-# Embed the `ui/` assets in the binary so a plain `cargo build` produces a
-# working executable, without needing the Tauri CLI or a dev server.
-default = ["custom-protocol", "highlight"]
-custom-protocol = ["tauri/custom-protocol"]
-# Syntax highlighting of code blocks. Disable it for a smaller binary with
-# `cargo build --release --no-default-features --features custom-protocol`.
-highlight = ["dep:syntect"]
-
+# Profiles are ignored in member crates, so they live here.
 [profile.release]
 codegen-units = 1
 lto = true

@@ -175,8 +175,8 @@ fn about() -> About {
 
 /// Help pages, embedded in the binary: name, title, Markdown.
 const HELP: &[(&str, &str, &str)] = &[
-    ("user-guide", "User Guide", include_str!("../docs/help/user-guide.md")),
-    ("theming", "Theming Guide", include_str!("../docs/help/theming.md")),
+    ("user-guide", "User Guide", include_str!("../../../docs/help/user-guide.md")),
+    ("theming", "Theming Guide", include_str!("../../../docs/help/theming.md")),
 ];
 
 #[tauri::command]
