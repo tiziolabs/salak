@@ -10,12 +10,13 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use adw::prelude::*;
-use gtk::gdk::{self, RGBA};
+use gtk::gdk;
 use gtk::{gio, glib, pango};
 use salak_core::files;
 use salak_core::markdown::Link;
 
 use crate::layout::{Align, Block, Para, Run, Style};
+use crate::theme::Themer;
 
 /// Space left and right of the text, in pixels. A tag's `left-margin` replaces
 /// the one of the view, so paragraphs add it themselves.
@@ -30,7 +31,7 @@ pub struct Env {
     /// Text width available to anchored widgets, kept up to date by the
     /// document.
     pub avail: Rc<Cell<i32>>,
-    pub dark: bool,
+    pub themer: Rc<Themer>,
 }
 
 /// How an anchored widget follows the width of the text.
@@ -114,37 +115,8 @@ impl Anchored {
     }
 }
 
-struct Colors {
-    muted: RGBA,
-    code_bg: RGBA,
-    quote_bg: RGBA,
-    link: RGBA,
-}
-
-// Defaults until the theme is applied; the tones come from the GNOME palette.
-fn colors(dark: bool) -> Colors {
-    let rgb = |r: u8, g: u8, b: u8, a: f32| {
-        RGBA::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a)
-    };
-    if dark {
-        Colors {
-            muted: rgb(0x9a, 0x99, 0x96, 1.0),
-            code_bg: rgb(0xff, 0xff, 0xff, 0.1),
-            quote_bg: rgb(0xff, 0xff, 0xff, 0.05),
-            link: rgb(0x78, 0xae, 0xed, 1.0),
-        }
-    } else {
-        Colors {
-            muted: rgb(0x5e, 0x5c, 0x64, 1.0),
-            code_bg: rgb(0x00, 0x00, 0x00, 0.07),
-            quote_bg: rgb(0x00, 0x00, 0x00, 0.04),
-            link: rgb(0x1c, 0x71, 0xd8, 1.0),
-        }
-    }
-}
-
 /// The tags every document has.
-pub fn tag_table(dark: bool) -> gtk::TextTagTable {
+pub fn tag_table(themer: &Themer) -> gtk::TextTagTable {
     let table = gtk::TextTagTable::new();
     const SCALES: [f64; 6] = [2.0, 1.5, 1.25, 1.0, 0.875, 0.85];
     for (i, scale) in SCALES.iter().enumerate() {
@@ -170,13 +142,7 @@ pub fn tag_table(dark: bool) -> gtk::TextTagTable {
             .strikethrough(true)
             .build(),
     );
-    table.add(
-        &gtk::TextTag::builder()
-            .name("code")
-            .family("monospace")
-            .scale(0.92)
-            .build(),
-    );
+    table.add(&gtk::TextTag::builder().name("code").scale(0.92).build());
     table.add(
         &gtk::TextTag::builder()
             .name("sup")
@@ -199,14 +165,16 @@ pub fn tag_table(dark: bool) -> gtk::TextTagTable {
             .pixels_below_lines(12)
             .build(),
     );
-    restyle(&table, dark);
+    restyle(&table, themer);
     table
 }
 
-/// Sets the colours of the tags, at creation and when the mode changes.
-pub fn restyle(table: &gtk::TextTagTable, dark: bool) {
-    let colors = colors(dark);
+/// Sets the colours and fonts of the tags, at creation and when the theme or
+/// the mode changes.
+pub fn restyle(table: &gtk::TextTagTable, themer: &Themer) {
+    let colors = themer.colors();
     if let Some(tag) = table.lookup("code") {
+        tag.set_property("family", themer.mono_family());
         tag.set_property("background-rgba", colors.code_bg);
     }
     if let Some(tag) = table.lookup("quote") {
@@ -260,12 +228,12 @@ fn format_tag(table: &gtk::TextTagTable, para: &Para, marker_width: i32) -> gtk:
     tag
 }
 
-fn link_tag(table: &gtk::TextTagTable, index: usize, dark: bool) -> gtk::TextTag {
+fn link_tag(table: &gtk::TextTagTable, index: usize, themer: &Themer) -> gtk::TextTag {
     let tag = gtk::TextTag::builder()
         .name(format!("link-{index}"))
         .underline(pango::Underline::Single)
         .build();
-    tag.set_property("foreground-rgba", colors(dark).link);
+    tag.set_property("foreground-rgba", themer.colors().link);
     table.add(&tag);
     tag
 }
@@ -307,7 +275,7 @@ impl Filler {
             match block {
                 Block::Text(para) => text(view, &buffer, &para, &self.env),
                 Block::Code { lang, text } => {
-                    let widget = code_block(&text, lang.as_deref());
+                    let widget = code_block(&text, lang.as_deref(), &self.env.themer);
                     let _ = embed(view, &buffer, &widget);
                     anchored.push(Anchored {
                         widget: widget.upcast(),
@@ -323,7 +291,7 @@ impl Filler {
                     });
                 }
                 Block::Rule => {
-                    let widget = gtk::Separator::new(gtk::Orientation::Horizontal);
+                    let widget = gtk::Separator::builder().css_classes(["md-rule"]).build();
                     let _ = embed(view, &buffer, &widget);
                     anchored.push(Anchored {
                         widget: widget.upcast(),
@@ -375,7 +343,7 @@ fn text(view: &gtk::TextView, buffer: &gtk::TextBuffer, para: &Para, env: &Env) 
                 links.push(link.clone());
                 links.len() - 1
             };
-            tags.push(link_tag(&table, index, env.dark));
+            tags.push(link_tag(&table, index, &env.themer));
         }
         let tags: Vec<&gtk::TextTag> = tags.iter().collect();
         // A newline would end the paragraph; U+2028 only breaks the line.
@@ -439,18 +407,24 @@ pub fn viewport(child: &impl IsA<gtk::Widget>) -> gtk::Viewport {
 }
 
 /// A read-only block of code. Long lines scroll inside the block.
-fn code_block(code: &str, _lang: Option<&str>) -> gtk::ScrolledWindow {
-    let view = gtk::TextView::builder()
-        .editable(false)
-        .cursor_visible(false)
-        .monospace(true)
-        .wrap_mode(gtk::WrapMode::None)
-        .left_margin(14)
-        .right_margin(14)
-        .top_margin(10)
-        .bottom_margin(10)
-        .build();
-    view.buffer().set_text(code);
+fn code_block(code: &str, lang: Option<&str>, themer: &Rc<Themer>) -> gtk::ScrolledWindow {
+    #[cfg(feature = "highlight")]
+    let view = crate::highlight::view(code, lang, themer);
+    #[cfg(not(feature = "highlight"))]
+    let view = {
+        let _ = (lang, themer);
+        let view = gtk::TextView::new();
+        view.buffer().set_text(code);
+        view
+    };
+    view.set_editable(false);
+    view.set_cursor_visible(false);
+    view.set_monospace(true);
+    view.set_wrap_mode(gtk::WrapMode::None);
+    view.set_left_margin(14);
+    view.set_right_margin(14);
+    view.set_top_margin(10);
+    view.set_bottom_margin(10);
     gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .vscrollbar_policy(gtk::PolicyType::Never)

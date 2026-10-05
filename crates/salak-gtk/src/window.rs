@@ -18,6 +18,7 @@ use crate::actions;
 use crate::document::{self, Document};
 use crate::keys;
 use crate::monitor;
+use crate::theme::{self, Themer};
 use crate::tree::Tree;
 
 pub struct Window {
@@ -33,6 +34,9 @@ pub struct Window {
     pages: gtk::Stack,
     /// Banner shown when the open file changed on disk.
     banner: adw::Banner,
+    themer: Rc<Themer>,
+    /// Watches the theme file, for live editing.
+    theme_monitor: RefCell<Option<gio::FileMonitor>>,
     /// Watches the file of the selected tab.
     monitor: RefCell<Option<gio::FileMonitor>>,
     /// Hash of the content each tab was drawn from, by tab key.
@@ -121,9 +125,15 @@ fn welcome() -> (adw::StatusPage, gtk::Button) {
 }
 
 impl Window {
-    pub fn new(app: &adw::Application, session: Session) -> Rc<Window> {
+    pub fn new(
+        app: &adw::Application,
+        session: Session,
+        theme_path: Option<PathBuf>,
+    ) -> Rc<Window> {
         install_css();
         document::install_css();
+        let (theme, warning) = theme::read(theme_path.as_deref());
+        let themer = Themer::new(theme);
 
         let tree = Tree::new();
         let tree_scroll = gtk::ScrolledWindow::builder()
@@ -233,12 +243,18 @@ impl Window {
             tabs,
             pages,
             banner,
+            themer,
+            theme_monitor: RefCell::default(),
             monitor: RefCell::default(),
             hashes: RefCell::default(),
             loads: Cell::new(0),
             picking: Cell::new(false),
         });
         this.banner.set_revealed(false);
+        if let Some(warning) = warning {
+            this.toast(&warning);
+        }
+        this.watch_theme(theme_path);
         actions::install(&this, app);
         keys::install(&this);
 
@@ -308,6 +324,24 @@ impl Window {
         }
         this.win.present();
         this
+    }
+
+    /// Applies the theme again, with no banner, whenever its file is saved.
+    /// Without a folder to watch, live editing starts with the next launch.
+    fn watch_theme(self: &Rc<Self>, path: Option<PathBuf>) {
+        let Some(path) = path else { return };
+        let Some(target) = salak_core::theme::watch_target(&path) else {
+            return;
+        };
+        let this = Rc::downgrade(self);
+        *self.theme_monitor.borrow_mut() = monitor::watch(&target, move || {
+            let Some(this) = this.upgrade() else { return };
+            let (theme, warning) = theme::read(Some(&path));
+            this.themer.set(theme);
+            if let Some(warning) = warning {
+                this.toast(&warning);
+            }
+        });
     }
 
     pub fn toast(&self, message: &str) {
@@ -425,6 +459,7 @@ impl Window {
             &String::from_utf8_lossy(&bytes),
             base,
             &root,
+            &self.themer,
             self.linker(true),
         );
         self.hashes.borrow_mut().insert(key, hash);
@@ -622,6 +657,7 @@ impl Window {
             page.markdown,
             Path::new(""),
             Path::new(""),
+            &self.themer,
             self.linker(false),
         );
         self.add_tab(&document, page.title, &key, page.title);
@@ -652,6 +688,7 @@ impl Window {
             &String::from_utf8_lossy(&bytes),
             base,
             &root,
+            &self.themer,
             self.linker(true),
         );
         let title = resolved.file_name().unwrap_or_default().to_string_lossy();

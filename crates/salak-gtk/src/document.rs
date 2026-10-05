@@ -11,9 +11,7 @@ use salak_core::markdown::{is_openable, Link};
 
 use crate::buffer::{self, Env, Filler};
 use crate::layout;
-
-/// Widest text, until the theme sets it.
-const MAX_WIDTH: i32 = 820;
+use crate::theme::Themer;
 
 /// What is drawn right away; the rest follows while the window stays usable.
 const FIRST_CHUNK: Duration = Duration::from_millis(40);
@@ -39,12 +37,17 @@ impl Document {
     /// `base` is the folder of the document, `root` the opened folder.
     /// `on_open` receives the links the window has to follow: help pages and
     /// local Markdown files. The others are handled here.
-    pub fn new(markdown: &str, base: &Path, root: &Path, on_open: Rc<dyn Fn(Link)>) -> Document {
+    pub fn new(
+        markdown: &str,
+        base: &Path,
+        root: &Path,
+        themer: &Rc<Themer>,
+        on_open: Rc<dyn Fn(Link)>,
+    ) -> Document {
         let blocks = layout::build(markdown, base, root);
 
-        let dark = adw::StyleManager::default().is_dark();
         let view = gtk::TextView::builder()
-            .buffer(&gtk::TextBuffer::new(Some(&buffer::tag_table(dark))))
+            .buffer(&gtk::TextBuffer::new(Some(&buffer::tag_table(themer))))
             .editable(false)
             .cursor_visible(false)
             .wrap_mode(gtk::WrapMode::WordChar)
@@ -93,7 +96,7 @@ impl Document {
             links: links.clone(),
             activate: dispatch.clone(),
             avail: avail.clone(),
-            dark,
+            themer: themer.clone(),
         };
         let mut filler = Filler::new(blocks, env);
         let anchored = Rc::new(RefCell::new(Vec::new()));
@@ -152,26 +155,23 @@ impl Document {
 
         connect_links(&view, links, dispatch);
 
-        // Light and dark colours of the tags.
-        let table = view.buffer().tag_table();
-        let manager = adw::StyleManager::default();
-        let handler = manager.connect_dark_notify(move |manager| {
-            buffer::restyle(&table, manager.is_dark());
-        });
-        let handler = RefCell::new(Some(handler));
-        view.connect_destroy(move |_| {
-            if let Some(handler) = handler.take() {
-                adw::StyleManager::default().disconnect(handler);
-            }
+        let clamp = adw::Clamp::builder().child(&view).build();
+        // Colours, fonts and width follow the theme and the mode.
+        let (weak_view, weak_clamp) = (view.downgrade(), clamp.downgrade());
+        themer.observe(move |themer| {
+            let (Some(view), Some(clamp)) = (weak_view.upgrade(), weak_clamp.upgrade()) else {
+                return false;
+            };
+            buffer::restyle(&view.buffer().tag_table(), themer);
+            let width = themer.max_width(&view, buffer::MARGIN);
+            clamp.set_maximum_size(width);
+            clamp.set_tightening_threshold(width);
+            true
         });
 
-        let clamp = adw::Clamp::builder()
-            .maximum_size(MAX_WIDTH)
-            .tightening_threshold(MAX_WIDTH)
-            .child(&view)
-            .build();
         let widget = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
+            .css_classes(["md-page"])
             .child(&buffer::viewport(&clamp))
             .build();
         Document {
@@ -205,9 +205,16 @@ impl Document {
     }
 
     /// Draws `markdown` again in place, at the same scroll position.
-    pub fn reload(&self, markdown: &str, base: &Path, root: &Path, on_open: Rc<dyn Fn(Link)>) {
+    pub fn reload(
+        &self,
+        markdown: &str,
+        base: &Path,
+        root: &Path,
+        themer: &Rc<Themer>,
+        on_open: Rc<dyn Fn(Link)>,
+    ) {
         let value = self.widget.vadjustment().value();
-        let fresh = Document::new(markdown, base, root, on_open);
+        let fresh = Document::new(markdown, base, root, themer, on_open);
         let content = fresh.widget.child();
         fresh.widget.set_child(None::<&gtk::Widget>);
         self.widget.set_child(content.as_ref());
@@ -326,6 +333,8 @@ pub fn install_css() {
     let provider = gtk::CssProvider::new();
     provider.load_from_string(
         "
+        .md-page { background-color: @view_bg_color; color: @view_fg_color; }
+        .md-page textview, .md-page textview text { background: none; color: inherit; }
         .code-block { background: alpha(currentColor, 0.07); border-radius: 6px; }
         .code-block textview, .code-block textview text { background: none; }
         .md-table { border: 1px solid alpha(currentColor, 0.2); }

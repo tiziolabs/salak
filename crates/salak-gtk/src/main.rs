@@ -1,9 +1,12 @@
 mod actions;
 mod buffer;
 mod document;
+#[cfg(feature = "highlight")]
+mod highlight;
 mod keys;
 mod layout;
 mod monitor;
+mod theme;
 mod tree;
 mod window;
 
@@ -19,7 +22,7 @@ pub const APP_ID: &str = "com.tiziolabs.salak";
 
 fn main() -> ExitCode {
     // Parsed before GTK starts, so that GApplication never sees the arguments.
-    let session = match cli::parse(std::env::args_os().skip(1)) {
+    let launch = match cli::parse(std::env::args_os().skip(1)) {
         Ok(cli::Command::Help) => {
             println!("{}", cli::USAGE);
             return ExitCode::SUCCESS;
@@ -28,12 +31,18 @@ fn main() -> ExitCode {
             println!("salak {}", env!("CARGO_PKG_VERSION"));
             return ExitCode::SUCCESS;
         }
-        // The theme is applied by the next phase.
-        Ok(cli::Command::Run { path, theme: _ }) => Session::from_args(path),
+        Ok(cli::Command::Run { path, theme }) => {
+            // An explicit theme must exist, the default one is optional.
+            let theme = match theme {
+                Some(theme) => salak_core::theme::explicit_path(&theme).map(Some),
+                None => Ok(salak_core::theme::default_path()),
+            };
+            theme.and_then(|theme| Ok((Session::from_args(path)?, theme)))
+        }
         Err(err) => Err(format!("{err}\n\n{}", cli::USAGE)),
     };
-    let session = match session {
-        Ok(session) => session,
+    let (session, theme) = match launch {
+        Ok(launch) => launch,
         Err(err) => {
             eprintln!("salak: {err}");
             return ExitCode::from(2);
@@ -47,12 +56,16 @@ fn main() -> ExitCode {
         .flags(gtk::gio::ApplicationFlags::NON_UNIQUE)
         .build();
 
-    let session = Rc::new(RefCell::new(Some(session)));
+    let launch = Rc::new(RefCell::new(Some((session, theme))));
     // The actions only hold weak references to the window.
     let windows = Rc::new(RefCell::new(Vec::new()));
+    #[cfg(feature = "highlight")]
+    app.connect_startup(|_| sourceview5::init());
     app.connect_activate(move |app| {
-        if let Some(session) = session.borrow_mut().take() {
-            windows.borrow_mut().push(window::Window::new(app, session));
+        if let Some((session, theme)) = launch.borrow_mut().take() {
+            windows
+                .borrow_mut()
+                .push(window::Window::new(app, session, theme));
         }
     });
 
