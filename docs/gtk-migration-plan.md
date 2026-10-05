@@ -139,6 +139,13 @@ Consequences:
   compiler.
 - Version features no higher than trixie's system libraries: GTK 4.18,
   libadwaita 1.7. T4.1 checks the exact GtkSourceView version.
+- T4.1 findings (2026-10-05). System libraries were checked on a development
+  machine (GTK 4.22, libadwaita 1.9, GtkSourceView 5.18), not yet on a
+  Debian 13 container: do that before T8.3. The `gtk4 0.11` and `glib 0.22`
+  crates require **Rust 1.92**, above trixie's 1.85, so `salak-gtk` sets
+  `rust-version = "1.92"` and cannot be built with trixie's own compiler
+  (1.95 from backports works). Dropping to `gtk4 0.9` would fit trixie but
+  not the sid versions this plan targets; decide before T9.2.
 
 ### D2. Debian Rust packaging rules that shape the code
 
