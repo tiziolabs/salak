@@ -25,6 +25,8 @@ struct Loading {
     done: Cell<bool>,
     /// An anchor to scroll to as soon as its heading is drawn.
     pending: RefCell<Option<String>>,
+    /// A scroll position to restore once the whole document is drawn.
+    restore: Cell<Option<f64>>,
 }
 
 pub struct Document {
@@ -119,6 +121,10 @@ impl Document {
                 loading.done.set(true);
                 if let Some(id) = loading.pending.take() {
                     scroll_to(&view, &loading, &id);
+                } else if let Some(value) = loading.restore.take() {
+                    if let Some(window) = scrolled(&view) {
+                        window.vadjustment().set_value(value);
+                    }
                 }
                 glib::ControlFlow::Break
             });
@@ -198,10 +204,53 @@ impl Document {
         })
     }
 
+    /// Draws `markdown` again in place, at the same scroll position.
+    pub fn reload(&self, markdown: &str, base: &Path, root: &Path, on_open: Rc<dyn Fn(Link)>) {
+        let value = self.widget.vadjustment().value();
+        let fresh = Document::new(markdown, base, root, on_open);
+        let content = fresh.widget.child();
+        fresh.widget.set_child(None::<&gtk::Widget>);
+        self.widget.set_child(content.as_ref());
+        if fresh.loading.done.get() {
+            // The new content has no size before its first layout.
+            let widget = self.widget.clone();
+            glib::timeout_add_local_once(Duration::from_millis(50), move || {
+                widget.vadjustment().set_value(value);
+            });
+        } else {
+            fresh.loading.restore.set(Some(value));
+        }
+    }
+
+    pub fn focus(&self) {
+        self.view.grab_focus();
+    }
+
+    /// Scrolls by `delta` pixels.
+    pub fn scroll_by(&self, delta: f64) {
+        let adjustment = self.widget.vadjustment();
+        let end = (adjustment.upper() - adjustment.page_size()).max(adjustment.lower());
+        adjustment.set_value((adjustment.value() + delta).clamp(adjustment.lower(), end));
+    }
+
+    /// Scrolls by a fraction of the visible height.
+    pub fn scroll_page(&self, fraction: f64) {
+        self.scroll_by(self.widget.vadjustment().page_size() * fraction);
+    }
+
+    pub fn scroll_edge(&self, top: bool) {
+        self.scroll_by(if top { f64::MIN } else { f64::MAX });
+    }
+
     /// Scrolls to a heading or an anchor, once it is drawn.
     pub fn scroll_to(&self, id: &str) {
         scroll_to(&self.view, &self.loading, id);
     }
+}
+
+fn scrolled(view: &gtk::TextView) -> Option<gtk::ScrolledWindow> {
+    view.ancestor(gtk::ScrolledWindow::static_type())
+        .and_downcast::<gtk::ScrolledWindow>()
 }
 
 fn scroll_to(view: &gtk::TextView, loading: &Loading, id: &str) {

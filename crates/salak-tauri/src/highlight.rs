@@ -62,10 +62,12 @@ fn find_syntax(info: &str) -> Option<&'static SyntaxReference> {
 }
 
 fn to_html(code: &str, syntax: &SyntaxReference) -> String {
-    let mut generator =
-        ClassedHTMLGenerator::new_with_class_style(syntax, syntaxes(), CLASS_STYLE);
+    let mut generator = ClassedHTMLGenerator::new_with_class_style(syntax, syntaxes(), CLASS_STYLE);
     for line in LinesWithEndings::from(code) {
-        if generator.parse_html_for_line_which_includes_newline(line).is_err() {
+        if generator
+            .parse_html_for_line_which_includes_newline(line)
+            .is_err()
+        {
             // A grammar failed on this input: fall back to plain text.
             return escape(code);
         }
@@ -93,7 +95,9 @@ mod tests {
 
     #[test]
     fn finds_common_languages() {
-        for lang in ["sh", "bash", "shell", "console", "rust", "rs", "yaml", "json", "py", "css"] {
+        for lang in [
+            "sh", "bash", "shell", "console", "rust", "rs", "yaml", "json", "py", "css",
+        ] {
             assert!(find_syntax(lang).is_some(), "{lang}");
         }
         assert!(find_syntax("rust title=\"main.rs\"").is_some());

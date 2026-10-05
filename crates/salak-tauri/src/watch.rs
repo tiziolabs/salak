@@ -14,7 +14,10 @@ pub fn watch(
     file: PathBuf,
     event: &'static str,
 ) -> notify::Result<RecommendedWatcher> {
-    let dir = file.parent().map(PathBuf::from).unwrap_or_else(|| file.clone());
+    let dir = file
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| file.clone());
     let payload = file.to_string_lossy().into_owned();
     let mut watcher = notify::recommended_watcher(move |result: notify::Result<Event>| {
         let Ok(change) = result else { return };

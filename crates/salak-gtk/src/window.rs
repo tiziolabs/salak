@@ -1,6 +1,9 @@
 //! The main window: sidebar tree, tabs and the welcome page.
 
 use std::cell::{Cell, RefCell};
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -13,6 +16,8 @@ use salak_core::session::{window_title, Session};
 
 use crate::actions;
 use crate::document::{self, Document};
+use crate::keys;
+use crate::monitor;
 use crate::tree::Tree;
 
 pub struct Window {
@@ -22,13 +27,29 @@ pub struct Window {
     stack: gtk::Stack,
     pub split: adw::OverlaySplitView,
     folder: gtk::Label,
-    tree: Rc<Tree>,
-    tabs: adw::TabView,
+    pub tree: Rc<Tree>,
+    pub tabs: adw::TabView,
+    /// Tabs, or the hint shown when none is open.
+    pages: gtk::Stack,
     /// Banner shown when the open file changed on disk.
-    #[allow(dead_code)]
     banner: adw::Banner,
+    /// Watches the file of the selected tab.
+    monitor: RefCell<Option<gio::FileMonitor>>,
+    /// Hash of the content each tab was drawn from, by tab key.
+    hashes: RefCell<HashMap<String, u64>>,
+    /// Counts the reads, so that a slow one never overrides a newer one.
+    loads: Cell<u64>,
     /// Only one file dialog at a time.
     picking: Cell<bool>,
+}
+
+/// Where the keyboard focus is, for the single-letter keys.
+#[derive(PartialEq)]
+pub enum Focus {
+    Tree,
+    Document,
+    /// A text field, a menu or a dialog: keys are theirs.
+    Other,
 }
 
 /// Shown by sway in the title bar / tab of the container.
@@ -56,8 +77,8 @@ fn primary_menu() -> gio::Menu {
     menu
 }
 
-/// The welcome page, shown while no folder is open.
-fn welcome() -> adw::StatusPage {
+/// The welcome page, shown while no folder is open, and its first button.
+fn welcome() -> (adw::StatusPage, gtk::Button) {
     let open_file = gtk::Button::builder()
         .label("Open File…")
         .action_name("win.open-file")
@@ -90,12 +111,13 @@ fn welcome() -> adw::StatusPage {
         .build();
     content.append(&buttons);
     content.append(&guide);
-    adw::StatusPage::builder()
+    let page = adw::StatusPage::builder()
         .icon_name(crate::APP_ID)
         .title("Salak")
         .description("Open a Markdown file, or a folder to browse its files.")
         .child(&content)
-        .build()
+        .build();
+    (page, open_file)
 }
 
 impl Window {
@@ -130,10 +152,16 @@ impl Window {
             .action_name("win.reload")
             .build();
         let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let hint = adw::StatusPage::builder()
+            .icon_name("text-x-generic-symbolic")
+            .title("Select a Markdown file in the tree.")
+            .build();
+        let pages = gtk::Stack::builder().vexpand(true).build();
+        pages.add_named(&tabs, Some("tabs"));
+        pages.add_named(&hint, Some("hint"));
         content.append(&tab_bar);
         content.append(&banner);
-        content.append(&tabs);
-        tabs.set_vexpand(true);
+        content.append(&pages);
 
         let split = adw::OverlaySplitView::builder()
             .sidebar(&sidebar)
@@ -143,7 +171,8 @@ impl Window {
             .max_sidebar_width(420.0)
             .build();
         let stack = gtk::Stack::new();
-        stack.add_named(&welcome(), Some("welcome"));
+        let (welcome, open_button) = welcome();
+        stack.add_named(&welcome, Some("welcome"));
         stack.add_named(&split, Some("main"));
 
         let toasts = adw::ToastOverlay::new();
@@ -178,6 +207,15 @@ impl Window {
             .default_height(700)
             .content(&toolbar)
             .build();
+        // Narrow windows overlay the sidebar instead of squeezing the text.
+        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            600.0,
+            adw::LengthUnit::Sp,
+        ));
+        narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
+        narrow.add_setter(&split, "show-sidebar", Some(&false.to_value()));
+        win.add_breakpoint(narrow);
         if under_tiling_wm() {
             win.set_decorated(false);
             header.set_show_start_title_buttons(false);
@@ -193,11 +231,16 @@ impl Window {
             folder,
             tree,
             tabs,
+            pages,
             banner,
+            monitor: RefCell::default(),
+            hashes: RefCell::default(),
+            loads: Cell::new(0),
             picking: Cell::new(false),
         });
         this.banner.set_revealed(false);
         actions::install(&this, app);
+        keys::install(&this);
 
         this.tree.connect_open(glib::clone!(
             #[weak]
@@ -207,7 +250,33 @@ impl Window {
         this.tabs.connect_selected_page_notify(glib::clone!(
             #[weak]
             this,
-            move |_| this.update_selection()
+            move |_| this.selection_changed()
+        ));
+        this.tabs.connect_n_pages_notify(glib::clone!(
+            #[weak]
+            this,
+            move |_| this.update_empty()
+        ));
+        this.tabs.connect_page_detached(glib::clone!(
+            #[weak]
+            this,
+            move |_, page, _| {
+                if let Some(key) = page.keyword() {
+                    this.hashes.borrow_mut().remove(key.as_str());
+                }
+            }
+        ));
+        // Moves the focus to where the sidebar is, or away from where it was.
+        this.split.connect_show_sidebar_notify(glib::clone!(
+            #[weak]
+            this,
+            move |split| {
+                if split.shows_sidebar() {
+                    this.tree.focus();
+                } else {
+                    this.focus_document();
+                }
+            }
         ));
 
         // The root and the initial file come from the command line.
@@ -221,14 +290,21 @@ impl Window {
                 this,
                 async move {
                     this.show_root(root).await;
-                    if let Some(file) = initial {
-                        this.open_document(file.clone());
-                        this.tree.reveal(&file).await;
+                    match initial {
+                        Some(file) => match this.load_document(file, "").await {
+                            Ok(resolved) => {
+                                this.tree.reveal(&resolved).await;
+                                this.focus_document();
+                            }
+                            Err(err) => this.toast(&err),
+                        },
+                        None => this.tree.focus(),
                     }
                 }
             ));
         } else {
             this.stack.set_visible_child_name("welcome");
+            GtkWindowExt::set_focus(&this.win, Some(&open_button));
         }
         this.win.present();
         this
@@ -272,11 +348,158 @@ impl Window {
         self.win.set_title(Some(&title));
     }
 
+    /// The key of the selected tab: a canonical path or `help:<name>`.
     fn selected_path(&self) -> Option<PathBuf> {
         self.tabs
             .selected_page()
-            .and_then(|page| page.tooltip())
-            .map(|path| PathBuf::from(path.as_str()))
+            .and_then(|page| page.keyword())
+            .map(|key| PathBuf::from(key.as_str()))
+    }
+
+    /// The tab changed: the title, the watch and the content follow.
+    fn selection_changed(self: &Rc<Self>) {
+        self.update_selection();
+        self.banner.set_revealed(false);
+        if let Some(monitor) = self.monitor.take() {
+            monitor.cancel();
+        }
+        let Some(path) = self
+            .selected_path()
+            .filter(|path| help_name(path).is_none())
+        else {
+            return;
+        };
+        // Only the selected tab is watched: the others are read again when
+        // they are selected.
+        let this = Rc::downgrade(self);
+        *self.monitor.borrow_mut() = monitor::watch(&path, move || {
+            if let Some(this) = this.upgrade() {
+                this.banner.set_revealed(true);
+            }
+        });
+        let this = self.clone();
+        glib::spawn_future_local(async move { this.refresh(path, false).await });
+    }
+
+    /// Without tab, a hint (or the welcome page, if there is no folder).
+    fn update_empty(&self) {
+        let empty = self.tabs.n_pages() == 0;
+        self.pages
+            .set_visible_child_name(if empty { "hint" } else { "tabs" });
+        if empty && self.session.borrow().root.is_none() {
+            self.stack.set_visible_child_name("welcome");
+        }
+    }
+
+    /// Reads a tab's file again and draws it if it changed (or `force`),
+    /// keeping the scroll position.
+    async fn refresh(self: &Rc<Self>, path: PathBuf, force: bool) {
+        let load = self.loads.get() + 1;
+        self.loads.set(load);
+        let result = self.read(&path).await;
+        if self.loads.get() != load {
+            return;
+        }
+        let bytes = match result {
+            Ok(bytes) => bytes,
+            Err(err) if force => return self.toast(&err),
+            // A file that vanished stays on screen until the tab is closed.
+            Err(_) => return,
+        };
+        let key = path.to_string_lossy().into_owned();
+        let hash = hash_of(&bytes);
+        if !force && self.hashes.borrow().get(&key) == Some(&hash) {
+            return;
+        }
+        let Some(root) = self.session.borrow().root.clone() else {
+            return;
+        };
+        let Some(document) = self
+            .find_page(&path)
+            .and_then(|page| Document::of(&page.child()))
+        else {
+            return;
+        };
+        let base = path.parent().unwrap_or(&root);
+        document.reload(
+            &String::from_utf8_lossy(&bytes),
+            base,
+            &root,
+            self.linker(true),
+        );
+        self.hashes.borrow_mut().insert(key, hash);
+    }
+
+    /// Reloads the document of the selected tab.
+    pub fn reload(self: &Rc<Self>) {
+        self.banner.set_revealed(false);
+        if let Some(path) = self
+            .selected_path()
+            .filter(|path| help_name(path).is_none())
+        {
+            let this = self.clone();
+            glib::spawn_future_local(async move { this.refresh(path, true).await });
+        }
+    }
+
+    pub fn dismiss_banner(&self) {
+        self.banner.set_revealed(false);
+    }
+
+    pub fn banner_revealed(&self) -> bool {
+        self.banner.is_revealed()
+    }
+
+    pub fn toggle_sidebar(&self) {
+        self.split.set_show_sidebar(!self.split.shows_sidebar());
+    }
+
+    pub fn sidebar_shown(&self) -> bool {
+        self.split.shows_sidebar()
+    }
+
+    pub fn focus_document(&self) {
+        if let Some(document) = self.document() {
+            document.focus();
+        }
+    }
+
+    /// The document of the selected tab.
+    pub fn document(&self) -> Option<Document> {
+        Document::of(&self.tabs.selected_page()?.child())
+    }
+
+    pub fn focus_context(&self) -> Focus {
+        let Some(focus) = GtkWindowExt::focus(&self.win) else {
+            return Focus::Document;
+        };
+        if &focus == self.tree.widget() || focus.is_ancestor(self.tree.widget()) {
+            Focus::Tree
+        } else if [gtk::Text::static_type(), gtk::Popover::static_type()]
+            .into_iter()
+            .chain([adw::Dialog::static_type()])
+            .any(|kind| focus.ancestor(kind).is_some())
+        {
+            Focus::Other
+        } else {
+            Focus::Document
+        }
+    }
+
+    /// Help › About Salak.
+    pub fn about(&self) {
+        let about = salak_core::about::about();
+        let dialog = adw::AboutDialog::builder()
+            .application_name("Salak")
+            .application_icon(crate::APP_ID)
+            .version(about.version)
+            .developer_name(about.author.as_str())
+            .website(about.repository)
+            .comments("A lightweight Markdown reader")
+            .license_type(gtk::License::Custom)
+            .license(about.license.replace(" OR ", " or "))
+            .build();
+        dialog.present(Some(&self.win));
     }
 
     pub fn close_tab(&self) {
@@ -401,7 +624,7 @@ impl Window {
             Path::new(""),
             self.linker(false),
         );
-        self.add_tab(&document, page.title, &key);
+        self.add_tab(&document, page.title, &key, page.title);
     }
 
     /// Opens a file and returns its canonical path.
@@ -413,21 +636,12 @@ impl Window {
         let Some(root) = self.session.borrow().root.clone() else {
             return Err("no folder is opened".into());
         };
-        let resolved = {
-            let root = root.clone();
-            let path = path.to_string_lossy().into_owned();
-            gio::spawn_blocking(move || files::resolve_in_root(&root, &path))
-                .await
-                .map_err(|_| "opening the file failed".to_string())??
-        };
+        let resolved = resolve(&root, &path).await?;
         // The canonical path merges the different ways to name a file.
         if self.reuse(&resolved, fragment) {
             return Ok(resolved);
         }
-        let (bytes, _) = gio::File::for_path(&resolved)
-            .load_contents_future()
-            .await
-            .map_err(|err| format!("{}: {}", resolved.display(), err.message()))?;
+        let bytes = self.read(&resolved).await?;
         // Another load of the same file may have finished meanwhile.
         if self.reuse(&resolved, fragment) {
             return Ok(resolved);
@@ -441,13 +655,31 @@ impl Window {
             self.linker(true),
         );
         let title = resolved.file_name().unwrap_or_default().to_string_lossy();
-        self.add_tab(&document, &title, &resolved.to_string_lossy());
+        let key = resolved.to_string_lossy();
+        self.hashes
+            .borrow_mut()
+            .insert(key.to_string(), hash_of(&bytes));
+        self.add_tab(&document, &title, &key, &key);
         scroll_to_fragment(&document, fragment);
         Ok(resolved)
     }
 
-    /// Adds a tab after the active one and selects it.
-    fn add_tab(&self, document: &Document, title: &str, key: &str) {
+    /// Reads a file of the opened folder.
+    async fn read(&self, path: &Path) -> Result<Vec<u8>, String> {
+        let Some(root) = self.session.borrow().root.clone() else {
+            return Err("no folder is opened".into());
+        };
+        let resolved = resolve(&root, path).await?;
+        let (bytes, _) = gio::File::for_path(&resolved)
+            .load_contents_future()
+            .await
+            .map_err(|err| format!("{}: {}", resolved.display(), err.message()))?;
+        Ok(bytes.to_vec())
+    }
+
+    /// Adds a tab after the active one and selects it. `key` identifies the
+    /// document, `tooltip` is what hovering the tab shows.
+    fn add_tab(&self, document: &Document, title: &str, key: &str, tooltip: &str) {
         let page = match self.tabs.selected_page() {
             Some(selected) => self
                 .tabs
@@ -455,19 +687,25 @@ impl Window {
             None => self.tabs.append(&document.widget),
         };
         page.set_title(title);
-        // The tooltip doubles as the identity of the tab: its canonical path,
-        // or `help:<name>`.
-        page.set_tooltip(key);
+        // The keyword only feeds the search of the tab overview, which Salak
+        // does not use: it carries the identity of the tab instead (its
+        // canonical path, or `help:<name>`).
+        page.set_keyword(key);
+        page.set_tooltip(tooltip);
         self.tabs.set_selected_page(&page);
+    }
+
+    fn find_page(&self, path: &Path) -> Option<adw::TabPage> {
+        let path = path.to_string_lossy();
+        (0..self.tabs.n_pages())
+            .map(|position| self.tabs.nth_page(position))
+            .find(|page| page.keyword().as_deref() == Some(&*path))
     }
 
     /// Brings the tab of `path` to the front, if there is one, and returns
     /// its content.
     fn select_existing(&self, path: &Path) -> Option<gtk::Widget> {
-        let path = path.to_string_lossy();
-        let page = (0..self.tabs.n_pages())
-            .map(|position| self.tabs.nth_page(position))
-            .find(|page| page.tooltip().as_deref() == Some(&*path))?;
+        let page = self.find_page(path)?;
         self.tabs.set_selected_page(&page);
         Some(page.child())
     }
@@ -482,6 +720,21 @@ impl Window {
         }
         true
     }
+}
+
+/// Resolves a path inside the opened folder, off the UI thread.
+async fn resolve(root: &Path, path: &Path) -> Result<PathBuf, String> {
+    let root = root.to_path_buf();
+    let path = path.to_string_lossy().into_owned();
+    gio::spawn_blocking(move || files::resolve_in_root(&root, &path))
+        .await
+        .map_err(|_| "opening the file failed".to_string())?
+}
+
+fn hash_of(bytes: &[u8]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish()
 }
 
 const HELP_PREFIX: &str = "help:";

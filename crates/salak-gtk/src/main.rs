@@ -1,7 +1,9 @@
 mod actions;
 mod buffer;
 mod document;
+mod keys;
 mod layout;
+mod monitor;
 mod tree;
 mod window;
 

@@ -259,6 +259,60 @@ impl Tree {
         })
     }
 
+    pub fn focus(&self) {
+        self.list.grab_focus();
+    }
+
+    /// Keyboard navigation. The arrows are handled here too, so that the list
+    /// view does not move the selection a second time.
+    pub fn key(&self, key: gtk::gdk::Key) -> bool {
+        use gtk::gdk::Key;
+        let count = self.model.n_items();
+        let selected = self.selection.selected();
+        let current = (selected != gtk::INVALID_LIST_POSITION).then_some(selected);
+        let row = current.and_then(|position| self.model.row(position));
+        let next = |position: u32| (position + 1).min(count.saturating_sub(1));
+        match key {
+            _ if count == 0 => return false,
+            Key::Down | Key::j => self.select(current.map_or(0, next)),
+            Key::Up | Key::k => self.select(current.map_or(count - 1, |p| p.saturating_sub(1))),
+            Key::g | Key::Home => self.select(0),
+            Key::G | Key::End => self.select(count - 1),
+            Key::Right | Key::l => match (row, current) {
+                (Some(row), Some(position)) if row.is_expandable() => {
+                    if row.is_expanded() {
+                        self.select(next(position));
+                    } else {
+                        row.set_expanded(true);
+                    }
+                }
+                _ => {}
+            },
+            Key::Left | Key::h => match row {
+                Some(row) if row.is_expanded() => row.set_expanded(false),
+                Some(row) => {
+                    if let Some(parent) = row.parent() {
+                        self.select(parent.position());
+                    }
+                }
+                None => {}
+            },
+            Key::Return | Key::KP_Enter | Key::o => {
+                if let Some(position) = current {
+                    self.activate(position);
+                }
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    fn select(&self, position: u32) {
+        self.selection.set_selected(position);
+        self.list
+            .scroll_to(position, gtk::ListScrollFlags::FOCUS, None);
+    }
+
     /// Shows the open document in bold.
     pub fn mark_active(&self, path: Option<PathBuf>) {
         *self.active.borrow_mut() = path;

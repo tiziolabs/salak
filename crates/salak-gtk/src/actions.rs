@@ -1,5 +1,6 @@
 //! Window and application actions, and their keyboard shortcuts.
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -53,9 +54,7 @@ pub fn install(window: &Rc<Window>, app: &adw::Application) {
             .activate(clone!(
                 #[weak]
                 window,
-                move |_: &adw::ApplicationWindow, _, _| {
-                    window.split.set_show_sidebar(!window.split.shows_sidebar())
-                }
+                move |_: &adw::ApplicationWindow, _, _| window.toggle_sidebar()
             ))
             .build(),
         gio::ActionEntry::builder("help")
@@ -71,17 +70,70 @@ pub fn install(window: &Rc<Window>, app: &adw::Application) {
                 }
             ))
             .build(),
-        // Placeholders until the tasks of phase 6.
         gio::ActionEntry::builder("reload")
-            .activate(|_: &adw::ApplicationWindow, _, _| eprintln!("salak: reload: not yet"))
+            .activate(clone!(
+                #[weak]
+                window,
+                move |_: &adw::ApplicationWindow, _, _| window.reload()
+            ))
             .build(),
         gio::ActionEntry::builder("about")
-            .activate(|_: &adw::ApplicationWindow, _, _| eprintln!("salak: about: not yet"))
+            .activate(clone!(
+                #[weak]
+                window,
+                move |_: &adw::ApplicationWindow, _, _| window.about()
+            ))
             .build(),
     ];
     window.win.add_action_entries(entries);
+    install_tab_menu(window);
 
     for (action, accels) in ACCELS {
         app.set_accels_for_action(action, accels);
     }
+}
+
+/// The context menu of the tabs. The actions work on the tab under the
+/// pointer, which `setup-menu` reports.
+fn install_tab_menu(window: &Rc<Window>) {
+    let target: Rc<RefCell<Option<adw::TabPage>>> = Rc::default();
+    let group = gio::SimpleActionGroup::new();
+    let add = |name: &str, close: fn(&adw::TabView, &adw::TabPage)| {
+        let action = gio::SimpleAction::new(name, None);
+        action.connect_activate(clone!(
+            #[strong]
+            target,
+            #[weak(rename_to = tabs)]
+            window.tabs,
+            move |_, _| {
+                if let Some(page) = target.borrow().as_ref() {
+                    close(&tabs, page);
+                }
+            }
+        ));
+        group.add_action(&action);
+        action
+    };
+    add("close", |tabs, page| tabs.close_page(page));
+    let others = add("close-others", |tabs, page| tabs.close_other_pages(page));
+    let right = add("close-right", |tabs, page| tabs.close_pages_after(page));
+    let left = add("close-left", |tabs, page| tabs.close_pages_before(page));
+    window.win.insert_action_group("tab", Some(&group));
+
+    let menu = gio::Menu::new();
+    menu.append(Some("Close This Tab"), Some("tab.close"));
+    menu.append(Some("Close Other Tabs"), Some("tab.close-others"));
+    menu.append(Some("Close Tabs to the Right"), Some("tab.close-right"));
+    menu.append(Some("Close Tabs to the Left"), Some("tab.close-left"));
+    window.tabs.set_menu_model(Some(&menu));
+    // Entries that would close nothing are disabled.
+    window.tabs.connect_setup_menu(move |tabs, page| {
+        *target.borrow_mut() = page.cloned();
+        if let Some(page) = page {
+            let (position, count) = (tabs.page_position(page), tabs.n_pages());
+            others.set_enabled(count > 1);
+            right.set_enabled(position + 1 < count);
+            left.set_enabled(position > 0);
+        }
+    });
 }
