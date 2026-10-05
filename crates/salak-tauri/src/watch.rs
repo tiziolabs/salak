@@ -24,7 +24,7 @@ pub fn watch(
             EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => true,
             _ => false,
         };
-        if relevant && change.paths.iter().any(|path| *path == file) {
+        if relevant && change.paths.contains(&file) {
             let _ = app.emit(event, &payload);
         }
     })?;
