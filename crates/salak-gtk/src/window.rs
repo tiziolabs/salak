@@ -7,9 +7,12 @@ use std::rc::Rc;
 use adw::prelude::*;
 use gtk::{gio, glib};
 use salak_core::files::{self, MARKDOWN_EXTENSIONS};
+use salak_core::help;
+use salak_core::markdown::Link;
 use salak_core::session::{window_title, Session};
 
 use crate::actions;
+use crate::document::{self, Document};
 use crate::tree::Tree;
 
 pub struct Window {
@@ -98,6 +101,7 @@ fn welcome() -> adw::StatusPage {
 impl Window {
     pub fn new(app: &adw::Application, session: Session) -> Rc<Window> {
         install_css();
+        document::install_css();
 
         let tree = Tree::new();
         let tree_scroll = gtk::ScrolledWindow::builder()
@@ -250,7 +254,13 @@ impl Window {
         let path = self.selected_path();
         self.tree.mark_active(path.clone());
         let title = match &path {
-            Some(path) => window_title(path.file_name()),
+            Some(path) => match help_name(path) {
+                Some(name) => help::page(name).map_or_else(
+                    || window_title(None),
+                    |page| window_title(Some(page.title.as_ref())),
+                ),
+                None => window_title(path.file_name()),
+            },
             None => window_title(
                 self.session
                     .borrow()
@@ -336,76 +346,154 @@ impl Window {
 
     /// Opens a file in a tab after the active one, or brings it to the front.
     pub fn open_document(self: &Rc<Self>, path: PathBuf) {
+        self.open_at(path, String::new(), false);
+    }
+
+    /// Opens a file and scrolls to `fragment`; `reveal` also shows the file in
+    /// the tree (links do, the tree already shows what it opens).
+    fn open_at(self: &Rc<Self>, path: PathBuf, fragment: String, reveal: bool) {
         let this = self.clone();
         glib::spawn_future_local(async move {
-            if let Err(err) = this.load_document(path).await {
-                this.toast(&err);
+            match this.load_document(path, &fragment).await {
+                Ok(resolved) if reveal => this.tree.reveal(&resolved).await,
+                Ok(_) => {}
+                Err(err) => this.toast(&err),
             }
         });
     }
 
-    async fn load_document(&self, path: PathBuf) -> Result<(), String> {
+    /// Where a link of a document leads, among the ones documents do not
+    /// handle themselves.
+    fn follow(self: &Rc<Self>, link: Link) {
+        match link {
+            Link::Help(name) => self.open_help(&name),
+            Link::Local { path, fragment } => self.open_at(path, fragment, true),
+            _ => {}
+        }
+    }
+
+    /// The callback documents use to reach the window. Help pages cannot open
+    /// files: their relative links are inert.
+    fn linker(self: &Rc<Self>, files: bool) -> Rc<dyn Fn(Link)> {
+        let this = Rc::downgrade(self);
+        Rc::new(move |link| {
+            let Some(this) = this.upgrade() else { return };
+            if files || matches!(link, Link::Help(_)) {
+                this.follow(link);
+            }
+        })
+    }
+
+    /// Shows a help page of salak-core in a tab.
+    pub fn open_help(self: &Rc<Self>, name: &str) {
+        let Some(page) = help::page(name) else {
+            return self.toast(&format!("no help page named {name}"));
+        };
+        // Without folder the welcome page is showing, which has no tabs.
+        self.stack.set_visible_child_name("main");
+        let key = format!("{HELP_PREFIX}{name}");
+        if self.select_existing(Path::new(&key)).is_some() {
+            return;
+        }
+        let document = Document::new(
+            page.markdown,
+            Path::new(""),
+            Path::new(""),
+            self.linker(false),
+        );
+        self.add_tab(&document, page.title, &key);
+    }
+
+    /// Opens a file and returns its canonical path.
+    async fn load_document(
+        self: &Rc<Self>,
+        path: PathBuf,
+        fragment: &str,
+    ) -> Result<PathBuf, String> {
         let Some(root) = self.session.borrow().root.clone() else {
             return Err("no folder is opened".into());
         };
         let resolved = {
+            let root = root.clone();
             let path = path.to_string_lossy().into_owned();
             gio::spawn_blocking(move || files::resolve_in_root(&root, &path))
                 .await
                 .map_err(|_| "opening the file failed".to_string())??
         };
         // The canonical path merges the different ways to name a file.
-        if self.select_existing(&resolved) {
-            return Ok(());
+        if self.reuse(&resolved, fragment) {
+            return Ok(resolved);
         }
         let (bytes, _) = gio::File::for_path(&resolved)
             .load_contents_future()
             .await
             .map_err(|err| format!("{}: {}", resolved.display(), err.message()))?;
         // Another load of the same file may have finished meanwhile.
-        if self.select_existing(&resolved) {
-            return Ok(());
+        if self.reuse(&resolved, fragment) {
+            return Ok(resolved);
         }
 
-        let text = gtk::TextView::builder()
-            .editable(false)
-            .cursor_visible(false)
-            .monospace(true)
-            .wrap_mode(gtk::WrapMode::WordChar)
-            .left_margin(24)
-            .right_margin(24)
-            .top_margin(16)
-            .bottom_margin(16)
-            .build();
-        text.buffer().set_text(&String::from_utf8_lossy(&bytes));
-        let scrolled = gtk::ScrolledWindow::builder().child(&text).build();
+        let base = resolved.parent().unwrap_or(&root);
+        let document = Document::new(
+            &String::from_utf8_lossy(&bytes),
+            base,
+            &root,
+            self.linker(true),
+        );
+        let title = resolved.file_name().unwrap_or_default().to_string_lossy();
+        self.add_tab(&document, &title, &resolved.to_string_lossy());
+        scroll_to_fragment(&document, fragment);
+        Ok(resolved)
+    }
 
+    /// Adds a tab after the active one and selects it.
+    fn add_tab(&self, document: &Document, title: &str, key: &str) {
         let page = match self.tabs.selected_page() {
             Some(selected) => self
                 .tabs
-                .insert(&scrolled, self.tabs.page_position(&selected) + 1),
-            None => self.tabs.append(&scrolled),
+                .insert(&document.widget, self.tabs.page_position(&selected) + 1),
+            None => self.tabs.append(&document.widget),
         };
-        page.set_title(&resolved.file_name().unwrap_or_default().to_string_lossy());
-        // The tooltip doubles as the identity of the tab: its canonical path.
-        page.set_tooltip(&resolved.to_string_lossy());
+        page.set_title(title);
+        // The tooltip doubles as the identity of the tab: its canonical path,
+        // or `help:<name>`.
+        page.set_tooltip(key);
         self.tabs.set_selected_page(&page);
-        Ok(())
     }
 
-    /// Brings the tab of `path` to the front, if there is one.
-    fn select_existing(&self, path: &Path) -> bool {
+    /// Brings the tab of `path` to the front, if there is one, and returns
+    /// its content.
+    fn select_existing(&self, path: &Path) -> Option<gtk::Widget> {
         let path = path.to_string_lossy();
-        let existing = (0..self.tabs.n_pages())
+        let page = (0..self.tabs.n_pages())
             .map(|position| self.tabs.nth_page(position))
-            .find(|page| page.tooltip().as_deref() == Some(&*path));
-        match existing {
-            Some(page) => {
-                self.tabs.set_selected_page(&page);
-                true
-            }
-            None => false,
+            .find(|page| page.tooltip().as_deref() == Some(&*path))?;
+        self.tabs.set_selected_page(&page);
+        Some(page.child())
+    }
+
+    /// Like `select_existing`, scrolling to `fragment`.
+    fn reuse(&self, path: &Path, fragment: &str) -> bool {
+        let Some(child) = self.select_existing(path) else {
+            return false;
+        };
+        if let Some(document) = Document::of(&child) {
+            scroll_to_fragment(&document, fragment);
         }
+        true
+    }
+}
+
+const HELP_PREFIX: &str = "help:";
+
+/// The name of the help page a tab shows, if it shows one.
+fn help_name(key: &Path) -> Option<&str> {
+    key.to_str()?.strip_prefix(HELP_PREFIX)
+}
+
+fn scroll_to_fragment(document: &Document, fragment: &str) {
+    if !fragment.is_empty() {
+        document.scroll_to(fragment);
     }
 }
 

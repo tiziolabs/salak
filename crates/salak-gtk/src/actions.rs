@@ -58,18 +58,22 @@ pub fn install(window: &Rc<Window>, app: &adw::Application) {
                 }
             ))
             .build(),
+        gio::ActionEntry::builder("help")
+            .parameter_type(Some(glib::VariantTy::STRING))
+            .activate(clone!(
+                #[weak]
+                window,
+                move |_: &adw::ApplicationWindow, _, page| {
+                    let page = page
+                        .and_then(|page| page.get::<String>())
+                        .unwrap_or_default();
+                    window.open_help(&page);
+                }
+            ))
+            .build(),
         // Placeholders until the tasks of phase 6.
         gio::ActionEntry::builder("reload")
             .activate(|_: &adw::ApplicationWindow, _, _| eprintln!("salak: reload: not yet"))
-            .build(),
-        gio::ActionEntry::builder("help")
-            .parameter_type(Some(glib::VariantTy::STRING))
-            .activate(|_: &adw::ApplicationWindow, _, page| {
-                let page = page
-                    .and_then(|page| page.get::<String>())
-                    .unwrap_or_default();
-                eprintln!("salak: help {page}: not yet");
-            })
             .build(),
         gio::ActionEntry::builder("about")
             .activate(|_: &adw::ApplicationWindow, _, _| eprintln!("salak: about: not yet"))

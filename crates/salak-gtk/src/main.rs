@@ -1,4 +1,7 @@
 mod actions;
+mod buffer;
+mod document;
+mod layout;
 mod tree;
 mod window;
 

@@ -833,6 +833,14 @@ code they test.
      `Send`), and fill the buffer in chunks with `glib::idle_add_local`.
 - **Done when:** the measure is written here and opening a 1 MB file does
   not freeze the window.
+- **Measured (2026-10-05, release build, 1 MB made of CHANGELOG, both help
+  pages and README repeated, 8442 blocks):** `layout` takes 15 ms, so it stays
+  on the main thread. Drawing everything at once took 500 ms and froze the
+  window, so `buffer::Filler` draws blocks in chunks (40 ms, then 30 ms per
+  idle callback): the first paint comes after about 56 ms and the window stays
+  usable, but the whole document is drawn after about 3.5 s, because the text
+  view lays out again between chunks. A link to a heading that is not drawn
+  yet scrolls as soon as it is.
 
 ### Phase 6: feature parity
 
@@ -1132,7 +1140,7 @@ developer (the Debian Rust team) as sponsor.
 | `Depends:` | | | |
 | Crates in the dependency tree | 457 (lock file) | | |
 | Memory with `README.md` open | | | |
-| Time to open a 1 MB file (T5.9) | | | |
+| Time to open a 1 MB file (T5.9) | | first paint 56 ms, complete after ~3.5 s | |
 
 ## 8. What is lost, on purpose
 

@@ -20,7 +20,7 @@ pub fn events(markdown: &str) -> Vec<Event<'_>> {
 }
 
 /// Where a link or an image points to.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Link {
     /// `#section`, percent-decoded, without the `#`.
     Anchor(String),

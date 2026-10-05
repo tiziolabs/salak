@@ -68,3 +68,6 @@ changed with a theme file: see the [theming guide](help:theming).
 
 Markdown files may contain raw HTML. Salak removes anything that could run
 code, never runs scripts, and only reads files inside the opened folder.
+
+On Linux, Salak does not render HTML: it only interprets `<br>`, `<kbd>`,
+`<sup>` and `<sub>`, drops the other tags and keeps the text between them.
