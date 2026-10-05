@@ -16,7 +16,10 @@ Options:
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
-    Run { path: Option<PathBuf>, css: Option<PathBuf> },
+    Run {
+        path: Option<PathBuf>,
+        css: Option<PathBuf>,
+    },
     Help,
     Version,
 }
@@ -70,7 +73,13 @@ mod tests {
 
     #[test]
     fn defaults_to_nothing() {
-        assert_eq!(parse_str(&[]), Ok(Command::Run { path: None, css: None }));
+        assert_eq!(
+            parse_str(&[]),
+            Ok(Command::Run {
+                path: None,
+                css: None
+            })
+        );
     }
 
     #[test]

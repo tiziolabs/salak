@@ -6,10 +6,10 @@
 //! - images become URLs of Tauri's asset protocol.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use pulldown_cmark::{html, CowStr, Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{html, Event, Tag};
+use salak_core::markdown::{self, Link};
 
 #[cfg(windows)]
 const ASSET_PREFIX: &str = "http://asset.localhost/";
@@ -18,15 +18,10 @@ const ASSET_PREFIX: &str = "asset://localhost/";
 
 pub fn render(markdown: &str, file: &Path, root: &Path) -> String {
     let base = file.parent().unwrap_or(root);
-    let options = Options::ENABLE_TABLES
-        | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_TASKLISTS;
-
-    let mut events: Vec<Event> = Parser::new_ext(markdown, options)
+    let events: Vec<Event> = markdown::events(markdown)
+        .into_iter()
         .map(|event| rewrite_urls(event, base, root))
         .collect();
-    add_heading_ids(&mut events);
     #[cfg(feature = "highlight")]
     let events = crate::highlight::highlight(events);
 
@@ -37,80 +32,57 @@ pub fn render(markdown: &str, file: &Path, root: &Path) -> String {
 
 fn rewrite_urls<'a>(event: Event<'a>, base: &Path, root: &Path) -> Event<'a> {
     match event {
-        Event::Start(Tag::Link { link_type, dest_url, title, id }) => {
-            let dest_url = match local_target(&dest_url, base, root) {
-                Some((path, fragment)) => format!("salak:{}{fragment}", encode(&path)).into(),
-                None => dest_url,
+        Event::Start(Tag::Link {
+            link_type,
+            dest_url,
+            title,
+            id,
+        }) => {
+            let dest_url = match markdown::resolve_link(&dest_url, base, root) {
+                Link::Local { path, fragment } => {
+                    let fragment = if fragment.is_empty() {
+                        String::new()
+                    } else {
+                        format!("#{}", encode(&fragment))
+                    };
+                    format!("salak:{}{fragment}", encode(&path.to_string_lossy())).into()
+                }
+                _ => dest_url,
             };
-            Event::Start(Tag::Link { link_type, dest_url, title, id })
+            Event::Start(Tag::Link {
+                link_type,
+                dest_url,
+                title,
+                id,
+            })
         }
-        Event::Start(Tag::Image { link_type, dest_url, title, id }) => {
-            let dest_url = match local_target(&dest_url, base, root) {
-                Some((path, _)) => format!("{ASSET_PREFIX}{}", encode(&path)).into(),
-                None => dest_url,
+        Event::Start(Tag::Image {
+            link_type,
+            dest_url,
+            title,
+            id,
+        }) => {
+            let dest_url = match markdown::resolve_link(&dest_url, base, root) {
+                Link::Local { path, .. } => {
+                    format!("{ASSET_PREFIX}{}", encode(&path.to_string_lossy())).into()
+                }
+                _ => dest_url,
             };
-            Event::Start(Tag::Image { link_type, dest_url, title, id })
+            Event::Start(Tag::Image {
+                link_type,
+                dest_url,
+                title,
+                id,
+            })
         }
         other => other,
     }
 }
 
-/// Resolves a relative URL (`../doc.md#usage`, `/img/logo.png`) to an
-/// absolute path and its `#fragment`. Returns `None` for URLs with a scheme
-/// and for pure fragments. Leading `/` means the opened folder, as on forges.
-fn local_target<'u>(url: &'u str, base: &Path, root: &Path) -> Option<(PathBuf, &'u str)> {
-    if url.is_empty() || url.starts_with('#') || url.starts_with("//") || has_scheme(url) {
-        return None;
-    }
-    let (rest, fragment) = url.find('#').map_or((url, ""), |i| url.split_at(i));
-    let path = rest.split('?').next().unwrap_or(rest);
-    let path = percent_decode(path);
-    if path.is_empty() {
-        return None;
-    }
-    let path = match path.strip_prefix('/') {
-        Some(from_root) => root.join(from_root),
-        None => base.join(path),
-    };
-    Some((dunce::canonicalize(&path).unwrap_or(path), fragment))
-}
-
-fn has_scheme(url: &str) -> bool {
-    match url.find(':') {
-        // A single letter is a Windows drive (`C:`), not a scheme.
-        Some(i) if i > 1 => {
-            let scheme = &url[..i];
-            scheme.starts_with(|c: char| c.is_ascii_alphabetic())
-                && scheme.chars().all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
-        }
-        _ => false,
-    }
-}
-
-fn percent_decode(input: &str) -> String {
-    let bytes = input.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        let hex = bytes.get(i + 1..i + 3).and_then(|h| std::str::from_utf8(h).ok());
-        match (bytes[i], hex.and_then(|h| u8::from_str_radix(h, 16).ok())) {
-            (b'%', Some(byte)) => {
-                out.push(byte);
-                i += 3;
-            }
-            (byte, _) => {
-                out.push(byte);
-                i += 1;
-            }
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 /// Same as JavaScript's `encodeURIComponent`.
-fn encode(path: &Path) -> String {
+fn encode(text: &str) -> String {
     let mut out = String::new();
-    for byte in path.to_string_lossy().bytes() {
+    for byte in text.bytes() {
         if byte.is_ascii_alphanumeric() || b"-_.!~*'()".contains(&byte) {
             out.push(byte as char);
         } else {
@@ -118,43 +90,6 @@ fn encode(path: &Path) -> String {
         }
     }
     out
-}
-
-/// Gives headings GitHub-like ids so that `#section` links work.
-fn add_heading_ids(events: &mut [Event]) {
-    let mut seen: HashMap<String, usize> = HashMap::new();
-    for i in 0..events.len() {
-        if !matches!(events[i], Event::Start(Tag::Heading { id: None, .. })) {
-            continue;
-        }
-        let mut text = String::new();
-        for event in &events[i + 1..] {
-            match event {
-                Event::End(TagEnd::Heading(_)) => break,
-                Event::Text(t) | Event::Code(t) => text.push_str(t),
-                _ => {}
-            }
-        }
-        let slug = slugify(&text);
-        let count = seen.entry(slug.clone()).or_insert(0);
-        let unique = if *count == 0 { slug } else { format!("{slug}-{count}") };
-        *count += 1;
-        if let Event::Start(Tag::Heading { id, .. }) = &mut events[i] {
-            *id = Some(CowStr::from(unique));
-        }
-    }
-}
-
-fn slugify(text: &str) -> String {
-    text.trim()
-        .to_lowercase()
-        .chars()
-        .filter_map(|c| match c {
-            c if c.is_alphanumeric() || c == '-' || c == '_' => Some(c),
-            c if c.is_whitespace() => Some('-'),
-            _ => None,
-        })
-        .collect()
 }
 
 /// Markdown files may embed raw HTML: everything is filtered through an
@@ -215,7 +150,8 @@ mod tests {
 
     #[test]
     fn rewrites_local_links_and_images() {
-        let html = render_in("[doc](other%20file.md#usage) ![img](img/a.png) [web](https://example.org)");
+        let html =
+            render_in("[doc](other%20file.md#usage) ![img](img/a.png) [web](https://example.org)");
         assert!(html.contains("href=\"salak:"), "{html}");
         assert!(html.contains("other%20file.md#usage"), "{html}");
         assert!(html.contains(&format!("src=\"{ASSET_PREFIX}")), "{html}");
@@ -227,6 +163,13 @@ mod tests {
         let html = render_in("# Hello World\n## Hello World\n");
         assert!(html.contains("id=\"hello-world\""), "{html}");
         assert!(html.contains("id=\"hello-world-1\""), "{html}");
+    }
+
+    #[test]
+    fn keeps_anchors_and_unsupported_links() {
+        let html = render_in("[a](#usage) [b](javascript:alert(1))");
+        assert!(html.contains("href=\"#usage\""), "{html}");
+        assert!(!html.contains("javascript"), "{html}");
     }
 
     #[test]
@@ -243,20 +186,15 @@ mod tests {
         assert!(html.contains("<code class=\"language-sh\">"), "{html}");
         assert!(html.contains("<span class=\"hl-comment"), "{html}");
         assert!(html.contains("&lt;hi&gt;"), "{html}");
-        assert!(html.contains("<code class=\"language-nope\">&lt;b&gt;x&lt;/b&gt;"), "{html}");
+        assert!(
+            html.contains("<code class=\"language-nope\">&lt;b&gt;x&lt;/b&gt;"),
+            "{html}"
+        );
     }
 
     #[test]
     fn keeps_help_links() {
         let html = render_in("[guide](help:theming)");
         assert!(html.contains("href=\"help:theming\""), "{html}");
-    }
-
-    #[test]
-    fn detects_schemes() {
-        assert!(has_scheme("https://example.org"));
-        assert!(has_scheme("mailto:a@b.c"));
-        assert!(!has_scheme("C:/doc.md"));
-        assert!(!has_scheme("docs/a.md"));
     }
 }

@@ -59,7 +59,7 @@ live at every save: `~/.config/salak/style.css` on Linux (honoring
 `$XDG_CONFIG_HOME`), `%APPDATA%\salak\style.css` on Windows, or the file
 given with `--css FILE`.
 
-The [theming guide](docs/help/theming.md), also in the **Help** menu, explains
+The [theming guide](crates/salak-core/help/theming.md), also in the **Help** menu, explains
 how to make a theme: colors, light and dark modes, code highlighting, fonts.
 
 ## Building

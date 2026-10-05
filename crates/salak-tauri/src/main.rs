@@ -1,30 +1,27 @@
 // Hide the console window on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod cli;
-mod files;
 #[cfg(feature = "highlight")]
 mod highlight;
 mod render;
-mod style;
 mod watch;
 
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use std::process::Command;
 use std::sync::Mutex;
 
+use salak_core::about::About;
+use salak_core::session::{window_title, Session};
+use salak_core::{cli, files, help, style};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 
 struct AppState {
-    /// Folder shown in the tree. Every file access is confined to it.
-    /// `None` until a file or a folder is opened.
-    root: Mutex<Option<PathBuf>>,
-    /// File given on the command line, opened at startup.
-    initial: Option<PathBuf>,
+    /// Folder shown in the tree (every file access is confined to it) and
+    /// file given on the command line.
+    session: Mutex<Session>,
     /// User style sheet. It may not exist (yet).
     style: Option<PathBuf>,
     /// Watches the opened document. Replacing it stops the previous watch.
@@ -36,46 +33,42 @@ struct AppState {
 /// What the frontend shows: a folder and, possibly, a file to open in it.
 /// Without a folder, it shows the welcome page.
 #[derive(Serialize)]
-struct Session {
+struct SessionDto {
     root: Option<String>,
     root_name: Option<String>,
     initial: Option<String>,
     separator: char,
 }
 
-impl Session {
-    fn new(root: Option<&Path>, initial: Option<&Path>) -> Self {
-        let lossy = |path: &Path| path.to_string_lossy().into_owned();
-        Session {
-            root: root.map(lossy),
-            root_name: root.map(|root| {
-                root.file_name()
-                    .map_or_else(|| lossy(root), |name| name.to_string_lossy().into_owned())
-            }),
+impl SessionDto {
+    fn new(session: &Session, initial: Option<&Path>) -> Self {
+        SessionDto {
+            root: session.root.as_deref().map(lossy),
+            root_name: session.root_name(),
             initial: initial.map(lossy),
             separator: MAIN_SEPARATOR,
         }
     }
 }
 
+fn lossy(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
 #[tauri::command]
-fn session(state: State<AppState>) -> Session {
-    Session::new(state.root.lock().unwrap().as_deref(), state.initial.as_deref())
+fn session(state: State<AppState>) -> SessionDto {
+    let session = state.session.lock().unwrap();
+    SessionDto::new(&session, session.initial.as_deref())
 }
 
 fn current_root(state: &AppState) -> Result<PathBuf, String> {
-    state.root.lock().unwrap().clone().ok_or_else(|| "no folder is opened".into())
-}
-
-/// Splits a file or a folder given by the user into the folder to browse
-/// and the file to open, as on the command line.
-fn split_target(path: PathBuf) -> (PathBuf, Option<PathBuf>) {
-    if path.is_dir() {
-        (path, None)
-    } else {
-        let root = path.parent().map(PathBuf::from).unwrap_or_else(|| path.clone());
-        (root, Some(path))
-    }
+    state
+        .session
+        .lock()
+        .unwrap()
+        .root
+        .clone()
+        .ok_or_else(|| "no folder is opened".into())
 }
 
 /// Opens a file or a folder chosen by the user. A file inside the folder
@@ -85,27 +78,19 @@ async fn open_path(
     window: WebviewWindow,
     state: State<'_, AppState>,
     path: String,
-) -> Result<Session, String> {
-    let path = dunce::canonicalize(&path)
-        .map_err(|err| format!("{path}: {err}"))?;
-    let mut root = state.root.lock().unwrap();
-    let (new_root, file) = match root.as_deref() {
-        Some(current) if path.is_file() && path.starts_with(current) => {
-            (current.to_path_buf(), Some(path))
-        }
-        _ => split_target(path),
-    };
+) -> Result<SessionDto, String> {
+    let mut session = state.session.lock().unwrap();
+    let opened = session.open(&path)?;
     // Lets the webview load images located in the new folder.
     window
         .asset_protocol_scope()
-        .allow_directory(&new_root, true)
+        .allow_directory(&opened.root, true)
         .map_err(|err| err.to_string())?;
-    if file.is_none() {
+    if opened.file.is_none() {
         *state.doc_watcher.lock().unwrap() = None;
-        set_title(&window, new_root.file_name());
+        set_title(&window, opened.root.file_name());
     }
-    *root = Some(new_root);
-    Ok(Session::new(root.as_deref(), file.as_deref()))
+    Ok(SessionDto::new(&session, opened.file.as_deref()))
 }
 
 /// Asks the user for a Markdown file, or a folder, to open.
@@ -116,7 +101,7 @@ async fn pick(
     folder: bool,
 ) -> Result<Option<String>, String> {
     let mut dialog = window.dialog().file().set_parent(&window);
-    if let Some(root) = state.root.lock().unwrap().as_deref() {
+    if let Some(root) = state.session.lock().unwrap().root.as_deref() {
         dialog = dialog.set_directory(root);
     }
     let picked = if folder {
@@ -128,18 +113,17 @@ async fn pick(
             .blocking_pick_file()
     };
     picked
-        .map(|path| path.into_path().map(|path| path.to_string_lossy().into_owned()))
+        .map(|path| {
+            path.into_path()
+                .map(|path| path.to_string_lossy().into_owned())
+        })
         .transpose()
         .map_err(|err| err.to_string())
 }
 
 /// Shown by sway in the title bar / tab of the container.
-fn set_title(window: &WebviewWindow, name: Option<&OsStr>) {
-    let title = match name {
-        Some(name) => format!("{} - Salak", name.to_string_lossy()),
-        None => "Salak".into(),
-    };
-    let _ = window.set_title(&title);
+fn set_title(window: &WebviewWindow, name: Option<&std::ffi::OsStr>) {
+    let _ = window.set_title(&window_title(name));
 }
 
 #[derive(Serialize)]
@@ -153,7 +137,7 @@ struct Document {
 
 /// Shown by Help › About Salak, from the package metadata.
 #[derive(Serialize)]
-struct About {
+struct AboutDto {
     version: &'static str,
     license: &'static str,
     author: String,
@@ -161,45 +145,57 @@ struct About {
 }
 
 #[tauri::command]
-fn about() -> About {
-    // `Name <email>`: only the name is shown.
-    let authors = env!("CARGO_PKG_AUTHORS");
-    let author = authors.split(':').next().unwrap_or_default();
-    About {
-        version: env!("CARGO_PKG_VERSION"),
-        license: env!("CARGO_PKG_LICENSE"),
-        author: author.split(" <").next().unwrap_or_default().to_string(),
-        repository: env!("CARGO_PKG_REPOSITORY"),
+fn about() -> AboutDto {
+    let About {
+        version,
+        license,
+        author,
+        repository,
+    } = salak_core::about::about();
+    AboutDto {
+        version,
+        license,
+        author,
+        repository,
     }
 }
 
-/// Help pages, embedded in the binary: name, title, Markdown.
-const HELP: &[(&str, &str, &str)] = &[
-    ("user-guide", "User Guide", include_str!("../../../docs/help/user-guide.md")),
-    ("theming", "Theming Guide", include_str!("../../../docs/help/theming.md")),
-];
-
 #[tauri::command]
 fn open_help(window: WebviewWindow, name: String) -> Result<Document, String> {
-    let (_, title, markdown) = HELP
-        .iter()
-        .find(|(id, ..)| *id == name)
-        .ok_or_else(|| format!("{name}: no such help page"))?;
-    let _ = window.set_title(&format!("{title} - Salak"));
+    let page = help::page(&name).ok_or_else(|| format!("{name}: no such help page"))?;
+    let _ = window.set_title(&format!("{} - Salak", page.title));
     Ok(Document {
         // Help pages link to each other with `help:` URLs, not paths.
         path: format!("help:{name}"),
-        title: title.to_string(),
-        html: render::render(markdown, Path::new(""), Path::new("")),
+        title: page.title.to_string(),
+        html: render::render(page.markdown, Path::new(""), Path::new("")),
     })
 }
 
 // Commands are async so that file system access never blocks the UI thread.
 
+#[derive(Serialize)]
+struct EntryDto {
+    name: String,
+    path: String,
+    is_dir: bool,
+}
+
+impl From<files::Entry> for EntryDto {
+    fn from(entry: files::Entry) -> Self {
+        EntryDto {
+            name: entry.name,
+            path: lossy(&entry.path),
+            is_dir: entry.is_dir,
+        }
+    }
+}
+
 #[tauri::command]
-async fn list_dir(state: State<'_, AppState>, path: String) -> Result<Vec<files::Entry>, String> {
+async fn list_dir(state: State<'_, AppState>, path: String) -> Result<Vec<EntryDto>, String> {
     let dir = files::resolve_in_root(&current_root(&state)?, &path)?;
-    files::list_dir(&dir)
+    let entries = files::list_dir(&dir)?;
+    Ok(entries.into_iter().map(EntryDto::from).collect())
 }
 
 #[tauri::command]
@@ -221,7 +217,11 @@ async fn open_file(
     set_title(&window, file.file_name());
     Ok(Document {
         path: file.to_string_lossy().into_owned(),
-        title: file.file_name().unwrap_or_default().to_string_lossy().into_owned(),
+        title: file
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned(),
         html,
     })
 }
@@ -230,8 +230,8 @@ async fn open_file(
 #[tauri::command]
 fn close_document(window: WebviewWindow, state: State<AppState>) {
     *state.doc_watcher.lock().unwrap() = None;
-    let root = state.root.lock().unwrap();
-    set_title(&window, root.as_deref().and_then(Path::file_name));
+    let session = state.session.lock().unwrap();
+    set_title(&window, session.root.as_deref().and_then(Path::file_name));
 }
 
 #[tauri::command]
@@ -262,35 +262,30 @@ fn browser_command() -> Command {
 /// Opens a web link in the default browser.
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
-    if !["http://", "https://", "mailto:"].iter().any(|scheme| url.starts_with(scheme)) {
+    if !["http://", "https://", "mailto:"]
+        .iter()
+        .any(|scheme| url.starts_with(scheme))
+    {
         return Err(format!("{url}: unsupported link"));
     }
-    let mut child = browser_command().arg(&url).spawn().map_err(|err| err.to_string())?;
+    let mut child = browser_command()
+        .arg(&url)
+        .spawn()
+        .map_err(|err| err.to_string())?;
     // Reap the process so it does not linger as a zombie.
     std::thread::spawn(move || child.wait());
     Ok(())
 }
 
 fn state_from_args(path: Option<PathBuf>, css: Option<PathBuf>) -> Result<AppState, String> {
-    let canonicalize = |path: PathBuf| {
-        dunce::canonicalize(&path).map_err(|err| format!("{}: {err}", path.display()))
-    };
-    // Without a path, the welcome page invites to open one.
-    let (root, initial) = match path {
-        Some(path) => {
-            let (root, initial) = split_target(canonicalize(path)?);
-            (Some(root), initial)
-        }
-        None => (None, None),
-    };
+    let session = Session::from_args(path)?;
     // An explicit style sheet must exist, the default one is optional.
     let style = match css {
-        Some(css) => Some(canonicalize(css)?),
+        Some(css) => Some(style::explicit_path(&css)?),
         None => style::default_path(),
     };
     Ok(AppState {
-        root: Mutex::new(root),
-        initial,
+        session: Mutex::new(session),
         style,
         doc_watcher: Mutex::default(),
         style_watcher: Mutex::default(),
@@ -376,7 +371,14 @@ fn main() {
         ])
         .setup(|app| {
             // Lets the webview load images located in the opened folder.
-            if let Some(root) = app.state::<AppState>().root.lock().unwrap().as_deref() {
+            if let Some(root) = app
+                .state::<AppState>()
+                .session
+                .lock()
+                .unwrap()
+                .root
+                .as_deref()
+            {
                 app.asset_protocol_scope().allow_directory(root, true)?;
             }
 

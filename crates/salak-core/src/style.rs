@@ -10,7 +10,10 @@ pub fn default_path() -> Option<PathBuf> {
     #[cfg(windows)]
     let dir = std::env::var_os("APPDATA").map(PathBuf::from);
     #[cfg(not(windows))]
-    let dir = xdg_config_home(std::env::var_os("XDG_CONFIG_HOME"), std::env::var_os("HOME"));
+    let dir = xdg_config_home(
+        std::env::var_os("XDG_CONFIG_HOME"),
+        std::env::var_os("HOME"),
+    );
     dir.map(|dir| dir.join("salak").join("style.css"))
 }
 
@@ -20,6 +23,11 @@ fn xdg_config_home(xdg: Option<OsString>, home: Option<OsString>) -> Option<Path
     xdg.map(PathBuf::from)
         .filter(|dir| dir.is_absolute())
         .or_else(|| home.map(|home| PathBuf::from(home).join(".config")))
+}
+
+/// A style sheet given on the command line, which must exist.
+pub fn explicit_path(path: &Path) -> Result<PathBuf, String> {
+    crate::canonicalize(path).map_err(|err| format!("{}: {err}", path.display()))
 }
 
 /// Contents of the style sheet, or `None` if it does not exist.
@@ -34,8 +42,8 @@ pub fn read(path: &Path) -> Result<Option<String>, String> {
 /// Real location of the style sheet, so that a symlink (e.g. into a
 /// dotfiles repository) is followed. `None` when its folder does not exist.
 pub fn watch_target(path: &Path) -> Option<PathBuf> {
-    dunce::canonicalize(path).ok().or_else(|| {
-        let dir = dunce::canonicalize(path.parent()?).ok()?;
+    crate::canonicalize(path).ok().or_else(|| {
+        let dir = crate::canonicalize(path.parent()?).ok()?;
         Some(dir.join(path.file_name()?))
     })
 }
@@ -54,8 +62,14 @@ mod tests {
     fn falls_back_to_home() {
         let expected = Some(PathBuf::from("/home/me/.config"));
         assert_eq!(xdg_config_home(None, Some("/home/me".into())), expected);
-        assert_eq!(xdg_config_home(Some("relative".into()), Some("/home/me".into())), expected);
-        assert_eq!(xdg_config_home(Some("".into()), Some("/home/me".into())), expected);
+        assert_eq!(
+            xdg_config_home(Some("relative".into()), Some("/home/me".into())),
+            expected
+        );
+        assert_eq!(
+            xdg_config_home(Some("".into()), Some("/home/me".into())),
+            expected
+        );
     }
 
     #[test]

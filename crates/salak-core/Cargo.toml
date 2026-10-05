@@ -1,0 +1,19 @@
+[package]
+name = "salak-core"
+version.workspace = true
+description = "Core of the Salak Markdown reader"
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme = "README.md"
+include = ["src/**", "help/**", "Cargo.toml", "README.md", "LICENSE-*"]
+
+[dependencies]
+# No `html` feature: each frontend renders the events its own way.
+pulldown-cmark = { version = "0.13", default-features = false }
+
+# Canonical paths without the `\\?\` prefix of Windows.
+[target.'cfg(windows)'.dependencies]
+dunce = "1"
