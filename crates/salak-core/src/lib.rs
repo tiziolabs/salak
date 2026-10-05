@@ -8,7 +8,7 @@ pub mod files;
 pub mod help;
 pub mod markdown;
 pub mod session;
-pub mod style;
+pub mod theme;
 
 pub use pulldown_cmark;
 

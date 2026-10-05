@@ -17,7 +17,7 @@ salak                 # welcome page, to open a file or a folder
 salak .               # browse the current directory
 salak ~/notes         # browse a folder
 salak README.md       # open a file, browsing its folder
-salak --css dark.css  # use another style sheet
+salak --theme dark.ini  # use another theme
 ```
 
 The button at the top of the sidebar, or `b`, hides it and gives the whole
@@ -62,7 +62,7 @@ the background is read again when it is brought back to the front.
 ## Appearance
 
 Salak follows the light or dark preference of the system. Its look can be
-changed with a style sheet: see the [theming guide](help:theming).
+changed with a theme file: see the [theming guide](help:theming).
 
 ## Security
 

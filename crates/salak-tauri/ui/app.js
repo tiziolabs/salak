@@ -15,10 +15,10 @@ const style = document.createElement("link");
 style.rel = "stylesheet";
 style.href = "markdown.css";
 // Comes after the default style sheet, so it wins at equal specificity.
-const userStyle = document.createElement("style");
+const userTheme = document.createElement("style");
 const article = document.createElement("article");
 article.className = "markdown-body";
-shadow.append(style, userStyle, article);
+shadow.append(style, userTheme, article);
 
 let session = null;
 let current = null;
@@ -416,16 +416,16 @@ function moveInTabMenu(delta) {
 
 // ---------------------------------------------------------------- changes
 
-async function loadUserStyle() {
+async function loadTheme() {
   try {
-    userStyle.textContent = (await invoke("user_style")) ?? "";
+    userTheme.textContent = (await invoke("theme_css")) ?? "";
   } catch (err) {
     console.error(err);
   }
 }
 
 // Applied right away: no banner, so that a theme can be tuned live.
-listen("style-changed", loadUserStyle);
+listen("theme-changed", loadTheme);
 
 function showBanner() {
   const text = document.createElement("span");
@@ -644,6 +644,6 @@ document.addEventListener("keydown", (event) => {
 // ---------------------------------------------------------------- startup
 
 (async () => {
-  await loadUserStyle();
+  await loadTheme();
   await start(await invoke("session"));
 })().catch((err) => showMessage(String(err)));

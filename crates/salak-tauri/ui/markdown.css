@@ -1,9 +1,13 @@
 /* Default style of rendered documents. It lives inside a shadow root, so it
    only applies to the document and never to the rest of the interface.
-   A user style sheet is loaded after it: the variables below are the
-   simplest way to theme a document. */
+   The user theme is loaded after it, as CSS generated from theme.ini: it
+   only sets the variables below. */
 
 :host {
+  --font: system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif;
+  --mono-font: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  --font-size: 16px;
+  --max-width: 860px;
   --fg: #1f2328;
   --muted: #59636e;
   --bg: #ffffff;
@@ -52,11 +56,11 @@
 }
 
 .markdown-body {
-  max-width: 860px;
+  max-width: var(--max-width);
   margin: 0 auto;
   padding: 32px 40px 64px;
   color: var(--fg);
-  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif;
+  font: var(--font-size)/1.6 var(--font);
   overflow-wrap: break-word;
 }
 
@@ -105,7 +109,7 @@ hr {
 img { max-width: 100%; }
 
 code, kbd, pre, samp {
-  font-family: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono-font);
   font-size: .875em;
 }
 

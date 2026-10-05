@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** themes are now small INI files (`theme.ini`) instead of CSS
+  (`style.css`), which is no longer read. The option `--css` is replaced by
+  `--theme`. A theme sets colors for the light and dark modes, fonts, the
+  font size and the width of the text; mistakes are reported on the standard
+  error instead of breaking the document. See Help › Theming Guide, which
+  explains how to migrate.
+
 ## 0.1.0 - 2026-10-04
 
 First release.

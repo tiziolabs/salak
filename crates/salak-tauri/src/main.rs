@@ -1,6 +1,7 @@
 // Hide the console window on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod css;
 #[cfg(feature = "highlight")]
 mod highlight;
 mod render;
@@ -12,7 +13,7 @@ use std::sync::Mutex;
 
 use salak_core::about::About;
 use salak_core::session::{window_title, Session};
-use salak_core::{cli, files, help, style};
+use salak_core::{cli, files, help, theme};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -22,12 +23,12 @@ struct AppState {
     /// Folder shown in the tree (every file access is confined to it) and
     /// file given on the command line.
     session: Mutex<Session>,
-    /// User style sheet. It may not exist (yet).
-    style: Option<PathBuf>,
+    /// User theme file. It may not exist (yet).
+    theme: Option<PathBuf>,
     /// Watches the opened document. Replacing it stops the previous watch.
     doc_watcher: Mutex<Option<notify::RecommendedWatcher>>,
-    /// Watches the user style sheet, for live editing of themes.
-    style_watcher: Mutex<Option<notify::RecommendedWatcher>>,
+    /// Watches the user theme, for live editing.
+    theme_watcher: Mutex<Option<notify::RecommendedWatcher>>,
 }
 
 /// What the frontend shows: a folder and, possibly, a file to open in it.
@@ -234,12 +235,19 @@ fn close_document(window: WebviewWindow, state: State<AppState>) {
     set_title(&window, session.root.as_deref().and_then(Path::file_name));
 }
 
+/// CSS of the user theme, read again at every call. Its warnings go to
+/// stderr: a broken theme never prevents Salak from working.
 #[tauri::command]
-async fn user_style(state: State<'_, AppState>) -> Result<Option<String>, String> {
-    match &state.style {
-        Some(path) => style::read(path),
-        None => Ok(None),
-    }
+async fn theme_css(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    let Some(path) = &state.theme else {
+        return Ok(None);
+    };
+    Ok(theme::load(path)?.map(|(theme, warnings)| {
+        for warning in warnings {
+            eprintln!("salak: {}: {warning}", path.display());
+        }
+        css::from_theme(&theme)
+    }))
 }
 
 fn browser_command() -> Command {
@@ -277,18 +285,18 @@ fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
-fn state_from_args(path: Option<PathBuf>, css: Option<PathBuf>) -> Result<AppState, String> {
+fn state_from_args(path: Option<PathBuf>, theme: Option<PathBuf>) -> Result<AppState, String> {
     let session = Session::from_args(path)?;
-    // An explicit style sheet must exist, the default one is optional.
-    let style = match css {
-        Some(css) => Some(style::explicit_path(&css)?),
-        None => style::default_path(),
+    // An explicit theme must exist, the default one is optional.
+    let theme = match theme {
+        Some(theme) => Some(theme::explicit_path(&theme)?),
+        None => theme::default_path(),
     };
     Ok(AppState {
         session: Mutex::new(session),
-        style,
+        theme,
         doc_watcher: Mutex::default(),
-        style_watcher: Mutex::default(),
+        theme_watcher: Mutex::default(),
     })
 }
 
@@ -343,7 +351,7 @@ fn main() {
             println!("salak {}", env!("CARGO_PKG_VERSION"));
             return;
         }
-        Ok(cli::Command::Run { path, css }) => state_from_args(path, css),
+        Ok(cli::Command::Run { path, theme }) => state_from_args(path, theme),
         Err(err) => Err(format!("{err}\n\n{}", cli::USAGE)),
     };
     let state = match state {
@@ -367,7 +375,7 @@ fn main() {
             open_help,
             about,
             open_url,
-            user_style
+            theme_css
         ])
         .setup(|app| {
             // Lets the webview load images located in the opened folder.
@@ -384,11 +392,11 @@ fn main() {
 
             // Without its folder, live reload starts with the next launch.
             let state = app.state::<AppState>();
-            if let Some(target) = state.style.as_deref().and_then(style::watch_target) {
-                let watcher = watch::watch(app.handle().clone(), target, "style-changed")
-                    .map_err(|err| eprintln!("salak: cannot watch the style sheet: {err}"))
+            if let Some(target) = state.theme.as_deref().and_then(theme::watch_target) {
+                let watcher = watch::watch(app.handle().clone(), target, "theme-changed")
+                    .map_err(|err| eprintln!("salak: cannot watch the theme: {err}"))
                     .ok();
-                *state.style_watcher.lock().unwrap() = watcher;
+                *state.theme_watcher.lock().unwrap() = watcher;
             }
 
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))

@@ -8,7 +8,7 @@ A lightweight, read-only Markdown reader for the desktop.
 - Tabs, one per opened document.
 - GitHub-like rendering: tables, footnotes, task lists, strikethrough.
 - Light and dark themes, following the system preference.
-- Custom style sheet, applied live while you edit it.
+- Custom theme, applied live while you edit it.
 - Watches the opened file and offers to reload it when it changes.
 - Keyboard driven, designed to fit tiling window managers such as sway.
 
@@ -29,7 +29,7 @@ salak                 # welcome page, to open a file or a folder
 salak .               # browse the current directory
 salak ~/notes         # browse a folder
 salak README.md       # open a file, browsing its folder
-salak --css dark.css  # use another style sheet
+salak --theme dark.ini  # use another theme
 ```
 
 ### Keys
@@ -52,15 +52,16 @@ salak --css dark.css  # use another style sheet
 | `Esc` | Dismiss the "file changed" banner |
 | `b`, `Ctrl+B` | Toggle the sidebar |
 
-## Custom style
+## Custom theme
 
-Salak applies a user style sheet on top of its default style, and reloads it
-live at every save: `~/.config/salak/style.css` on Linux (honoring
-`$XDG_CONFIG_HOME`), `%APPDATA%\salak\style.css` on Windows, or the file
-given with `--css FILE`.
+Salak applies a user theme on top of its default look, and reloads it live at
+every save: `~/.config/salak/theme.ini` on Linux (honoring `$XDG_CONFIG_HOME`),
+`%APPDATA%\salak\theme.ini` on Windows, or the file given with
+`--theme FILE`. It is a small INI file, not CSS.
 
 The [theming guide](crates/salak-core/help/theming.md), also in the **Help** menu, explains
 how to make a theme: colors, light and dark modes, code highlighting, fonts.
+It also tells how to migrate a `style.css` from version 0.1.0.
 
 ## Building
 
