@@ -25,3 +25,24 @@ sourceview5 = { version = "0.11", optional = true }
 default = ["highlight"]
 # Syntax highlighting of code blocks with GtkSourceView.
 highlight = ["dep:sourceview5"]
+
+# `cargo deb -p salak-gtk` builds a Debian package in target/debian/. Man pages
+# are compressed by cargo-deb.
+[package.metadata.deb]
+name = "salak"
+section = "text"
+extended-description = """\
+Salak shows the Markdown files of a folder in a tree, and renders the selected \
+one: tables, footnotes, task lists and highlighted code blocks, in light and \
+dark modes. It reloads files changed on disk and applies a user theme."""
+# Shared libraries (GTK 4, libadwaita, GtkSourceView) are found by dpkg-shlibdeps.
+depends = "$auto"
+assets = [
+    ["../../target/release/salak", "usr/bin/", "755"],
+    ["data/com.tiziolabs.salak.desktop", "usr/share/applications/", "644"],
+    ["data/com.tiziolabs.salak.metainfo.xml", "usr/share/metainfo/", "644"],
+    ["data/salak.1", "usr/share/man/man1/", "644"],
+    ["data/icons/com.tiziolabs.salak.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["data/icons/com.tiziolabs.salak.png", "usr/share/icons/hicolor/128x128/apps/", "644"],
+    ["../../README.md", "usr/share/doc/salak/", "644"],
+]
