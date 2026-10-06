@@ -1,0 +1,58 @@
+.TH SALAK 1 "October 2026" "Salak 0.1.0" "User Commands"
+.SH NAME
+salak \- lightweight Markdown reader
+.SH SYNOPSIS
+.B salak
+.RB [ \-\-theme
+.IR FILE ]
+.RI [ PATH ]
+.br
+.B salak
+.RB ( \-h " | " \-V )
+.SH DESCRIPTION
+.B salak
+is a read\-only Markdown reader. It shows the Markdown files of a folder in a
+tree and renders the selected one in a tab.
+.PP
+If
+.I PATH
+is a folder, it is browsed. If it is a file, it is opened and its folder is
+browsed. Without
+.IR PATH ,
+a welcome page offers to open a file or a folder.
+.SH OPTIONS
+.TP
+.BI \-\-theme " FILE"
+Use
+.I FILE
+as the theme instead of the default one (see
+.BR FILES ).
+.TP
+.BR \-h ", " \-\-help
+Print the usage and exit.
+.TP
+.BR \-V ", " \-\-version
+Print the version and exit.
+.SH FILES
+.TP
+.I $XDG_CONFIG_HOME/salak/theme.ini
+The theme: an INI file setting colors for the light and dark modes, fonts, the
+font size and the width of the text. It defaults to
+.I ~/.config/salak/theme.ini
+and is applied again at every save. See Help, Theming Guide, in the application.
+.SH ENVIRONMENT
+.TP
+.B XDG_CONFIG_HOME
+Folder of the configuration, instead of
+.IR ~/.config .
+.TP
+.BR SWAYSOCK ", " I3SOCK ", " HYPRLAND_INSTANCE_SIGNATURE
+When one of them is set, a tiling window manager is assumed and the window
+has no decorations.
+.SH EXIT STATUS
+.B 2
+on invalid arguments or a missing path.
+.SH SEE ALSO
+Project page:
+.UR https://github.com/tiziolabs/salak
+.UE

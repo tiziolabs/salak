@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.tiziolabs.salak</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <name>Salak</name>
+  <summary>A lightweight Markdown reader</summary>
+  <description>
+    <p>
+      Salak shows the Markdown files of a folder in a tree and renders the
+      selected one: tables, footnotes, task lists and highlighted code blocks,
+      in light and dark modes.
+    </p>
+    <p>
+      Documents open in tabs, reload when they change on disk, and follow a
+      small theme file that is applied live. Everything can be driven from the
+      keyboard.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.tiziolabs.salak.desktop</launchable>
+  <url type="homepage">https://github.com/tiziolabs/salak</url>
+  <url type="bugtracker">https://github.com/tiziolabs/salak/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/tiziolabs/salak/main/docs/assets/salak-banner.png</image>
+      <caption>The banner of Salak</caption>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>salak</binary>
+  </provides>
+  <developer id="com.tiziolabs">
+    <name>Timothe Tizio</name>
+  </developer>
+  <releases>
+    <release version="0.1.0" date="2026-10-04"/>
+  </releases>
+</component>

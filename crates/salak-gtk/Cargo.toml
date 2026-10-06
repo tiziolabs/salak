@@ -9,6 +9,7 @@ rust-version = "1.92"
 authors.workspace = true
 repository.workspace = true
 publish = false
+include = ["src/**", "data/**", "Cargo.toml"]
 
 [[bin]]
 name = "salak"
