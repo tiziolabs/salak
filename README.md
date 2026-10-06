@@ -12,9 +12,14 @@ A lightweight, read-only Markdown reader for the desktop.
 - Watches the opened file and offers to reload it when it changes.
 - Keyboard driven, designed to fit tiling window managers such as sway.
 
-Salak is built with [Tauri 2](https://tauri.app): a Rust backend and the
-system webview (WebKitGTK on Linux, WebView2 on Windows). The frontend is
-plain HTML, CSS and JavaScript, with no framework, no bundler and no npm.
+Salak is written in Rust, in three crates:
+
+- `salak-core`: the logic shared by both applications (command line, files,
+  Markdown parsing, links, themes, help pages);
+- `salak-gtk`: the Linux application, native GTK 4 and libadwaita, with no web
+  engine;
+- `salak-tauri`: the Windows application, built with [Tauri 2](https://tauri.app)
+  and WebView2, with a plain HTML, CSS and JavaScript frontend.
 
 ## Download
 
@@ -65,30 +70,34 @@ It also tells how to migrate a `style.css` from version 0.1.0.
 
 ## Building
 
-Requirements on Linux: a Rust toolchain and the WebKitGTK development
-files. On Debian / Ubuntu:
+Salak needs Debian 13 (trixie), Ubuntu 24.04 or later, or any distribution
+with GTK 4.18 and libadwaita 1.7. Requirements on Linux: a Rust toolchain
+(1.92 or later, see `rust-version` of `salak-gtk`) and the development files of
+GTK 4, libadwaita and GtkSourceView. On Debian / Ubuntu:
 
 ```sh
-sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libssl-dev
+sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev
 ```
 
-On Arch: `sudo pacman -S --needed base-devel webkit2gtk-4.1`.
+On Arch: `sudo pacman -S --needed base-devel gtk4 libadwaita gtksourceview5`.
 
-Then a plain Cargo build is enough, the Tauri CLI is not needed:
+Then a plain Cargo build is enough:
 
 ```sh
-cargo build --release -p salak-tauri
+cargo build --release -p salak-gtk
 ./target/release/salak
 ```
 
-Syntax highlighting of code blocks is enabled by default. It adds about
-2 MB to the binary; to build without it:
+Always select one application with `-p`: both produce a binary named `salak`.
+Syntax highlighting of code blocks, done by GtkSourceView, is enabled by
+default; to build without it:
 
 ```sh
-cargo build --release -p salak-tauri --no-default-features --features custom-protocol
+cargo build --release -p salak-gtk --no-default-features
 ```
 
-Run the tests with `cargo test -p salak-tauri`.
+Run the tests with `cargo test -p salak-core -p salak-gtk`. They need no
+display.
 
 The release procedure is described in [RELEASING.md](RELEASING.md).
 
@@ -98,14 +107,21 @@ With [cargo-deb](https://crates.io/crates/cargo-deb):
 
 ```sh
 cargo install cargo-deb
-cargo deb -p salak-tauri
+cargo deb -p salak-gtk
 sudo apt install ./target/debian/salak_*.deb
 ```
 
 The package installs the binary, a desktop entry that opens Markdown files,
-and the icons. Its dependencies are taken from the libraries the binary links
-to, so it only installs on systems at least as recent as the build system:
-build it on the oldest release to support.
+the AppStream metadata, a man page and the icons. Its dependencies are taken
+from the libraries the binary links to, so it only installs on systems at
+least as recent as the build system: build it on the oldest release to
+support.
+
+### Windows
+
+The Windows application is the Tauri one. `cargo build --release -p salak-tauri`
+builds it on any system with the Tauri requirements (on Linux, WebKitGTK), but
+it is only packaged for Windows.
 
 ### Windows installer
 
@@ -147,18 +163,17 @@ Example rules in `~/.config/sway/config` (check the `app_id` with
 
 ```
 bindsym $mod+m exec salak ~/notes
-for_window [app_id="salak"] floating enable, resize set 1100 800
+for_window [app_id="com.tiziolabs.salak"] floating enable, resize set 1100 800
 ```
 
-If the window stays blank, a known issue of WebKitGTK with some GPU
-drivers, start it with `WEBKIT_DISABLE_DMABUF_RENDERER=1 salak`.
 
 ## Security
 
-Markdown files may contain raw HTML. Salak sanitizes the rendered HTML with
-[ammonia](https://crates.io/crates/ammonia), forbids scripts through a
-Content Security Policy, and only gives access to files inside the opened
-folder.
+Salak only gives access to files inside the opened folder. On Linux it does
+not render HTML at all: only `<br>`, `<kbd>`, `<sup>` and `<sub>` are
+interpreted, other tags are dropped. On Windows, raw HTML is sanitized with
+[ammonia](https://crates.io/crates/ammonia) and scripts are forbidden by a
+Content Security Policy.
 
 ## License
 

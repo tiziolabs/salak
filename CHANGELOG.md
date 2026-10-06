@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Linux:** Salak is now a native GTK 4 and libadwaita application, without
+  WebKitGTK. It needs GTK 4.18 and libadwaita 1.7 (Debian 13 or later,
+  Ubuntu 24.04 or later). Raw HTML in Markdown is no longer rendered, except
+  `<br>`, `<kbd>`, `<sup>` and `<sub>`. The application identifier is
+  `com.tiziolabs.salak`: the desktop entry, the icon and the sway `app_id`
+  use it. Windows keeps the Tauri application.
+- The Debian package ships AppStream metadata and a man page.
 - **Breaking:** themes are now small INI files (`theme.ini`) instead of CSS
   (`style.css`), which is no longer read. The option `--css` is replaced by
   `--theme`. A theme sets colors for the light and dark modes, fonts, the

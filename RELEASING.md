@@ -4,7 +4,7 @@ A release publishes, on the GitHub page of the project:
 
 | File | Built on |
 | --- | --- |
-| `salak_<version>-1_amd64.deb` | Linux, with `cargo deb` |
+| `salak_<version>-1_amd64.deb` | Linux, with `cargo deb -p salak-gtk` |
 | `Salak_<version>_x64-setup.exe` | Windows, with `scripts\package-windows.ps1` |
 | `salak-<version>-windows-x64-portable.zip` | Windows, same script |
 | Source code (zip and tar.gz) | GitHub, from the tag |
@@ -14,8 +14,8 @@ packages take it from there.
 
 ## 1. Prepare
 
-1. Set `version` in `[workspace.package]` of the root `Cargo.toml`, then run `cargo build -p salak-tauri` to update
-   `Cargo.lock`.
+1. Set `version` in `[workspace.package]` of the root `Cargo.toml`, then run `cargo build -p salak-gtk` to update
+   `Cargo.lock`. Both applications and `salak-core` share this version.
 2. Replace `Unreleased` with the date in `CHANGELOG.md`.
 3. Commit, tag and push:
 
@@ -31,7 +31,7 @@ On Linux, preferably the oldest release to support (see the README):
 
 ```sh
 git checkout v0.1.0
-cargo deb -p salak-tauri
+cargo deb -p salak-gtk
 # → target/debian/salak_0.1.0-1_amd64.deb
 ```
 
@@ -44,6 +44,9 @@ powershell -ExecutionPolicy Bypass -File scripts\package-windows.ps1
 # → dist\Salak_0.1.0_x64-setup.exe
 # → dist\salak-0.1.0-windows-x64-portable.zip
 ```
+
+The Linux build (`salak-gtk`) and the Windows build (`salak-tauri`) are separate:
+never build both in one command, they write the same `target/release/salak`.
 
 ## 3. Publish
 
