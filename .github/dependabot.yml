@@ -10,3 +10,30 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # These crates must follow the versions packaged in Debian unstable, see
+    # "Dependencies" in RELEASING.md. Patch updates are still welcome.
+    ignore:
+      - dependency-name: "gtk4"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "libadwaita"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "sourceview5"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "pulldown-cmark"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "glib"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "gio"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"

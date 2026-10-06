@@ -68,3 +68,19 @@ gh release create v0.1.0 --draft --title "Salak 0.1.0" --notes "…" \
 gh release upload v0.1.0 dist\Salak_0.1.0_x64-setup.exe dist\salak-0.1.0-windows-x64-portable.zip
 gh release edit v0.1.0 --draft=false
 ```
+
+## Dependencies
+
+`salak-core` and `salak-gtk` are meant to be packaged by Debian, which builds
+offline from its own packaged crates. So:
+
+- Before raising the version of a dependency of these crates, check that
+  Debian unstable has it: `https://packages.debian.org/sid/librust-<crate>-dev`.
+- `gtk4`, `libadwaita`, `sourceview5`, `pulldown-cmark`, `glib` and `gio` are
+  excluded from dependabot minor and major updates for that reason; patch
+  updates are accepted.
+- A new dependency needs a strong reason and must already be in Debian.
+- Do not use system library features newer than GTK 4.18 and libadwaita 1.7
+  (Debian 13).
+
+`salak-tauri` is not packaged by Debian and is free of these rules.
