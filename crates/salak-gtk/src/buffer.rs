@@ -407,7 +407,7 @@ pub fn viewport(child: &impl IsA<gtk::Widget>) -> gtk::Viewport {
 }
 
 /// A read-only block of code. Long lines scroll inside the block.
-fn code_block(code: &str, lang: Option<&str>, themer: &Rc<Themer>) -> gtk::ScrolledWindow {
+fn code_block(code: &str, lang: Option<&str>, themer: &Rc<Themer>) -> gtk::Overlay {
     #[cfg(feature = "highlight")]
     let view = crate::highlight::view(code, lang, themer);
     #[cfg(not(feature = "highlight"))]
@@ -425,13 +425,45 @@ fn code_block(code: &str, lang: Option<&str>, themer: &Rc<Themer>) -> gtk::Scrol
     view.set_right_margin(14);
     view.set_top_margin(10);
     view.set_bottom_margin(10);
-    gtk::ScrolledWindow::builder()
+    let scrolled = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .vscrollbar_policy(gtk::PolicyType::Never)
         .propagate_natural_height(true)
-        .css_classes(["code-block"])
         .child(&viewport(&view))
-        .build()
+        .build();
+    let overlay = gtk::Overlay::builder()
+        .css_classes(["code-block"])
+        .child(&scrolled)
+        .build();
+    overlay.add_overlay(&copy_button(code));
+    overlay
+}
+
+/// The button at the top right of a code block, copying its code.
+fn copy_button(code: &str) -> gtk::Button {
+    let button = gtk::Button::builder()
+        .icon_name("edit-copy-symbolic")
+        .tooltip_text("Copy")
+        .halign(gtk::Align::End)
+        .valign(gtk::Align::Start)
+        .margin_top(6)
+        .margin_end(6)
+        .css_classes(["flat", "code-copy"])
+        .build();
+    let code = code.to_owned();
+    button.connect_clicked(move |button| {
+        button.clipboard().set_text(&code);
+        button.set_icon_name("object-select-symbolic");
+        glib::timeout_add_local_once(
+            Duration::from_millis(1500),
+            glib::clone!(
+                #[weak]
+                button,
+                move || button.set_icon_name("edit-copy-symbolic")
+            ),
+        );
+    });
+    button
 }
 
 /// Pango markup of runs. Links are `<a href="N">`, N indexing `Env::links`.
