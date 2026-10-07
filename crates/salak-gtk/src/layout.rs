@@ -203,7 +203,6 @@ impl<'a> Builder<'a> {
                 });
             }
             Event::Html(html) | Event::InlineHtml(html) => self.html(&html),
-            _ => {}
         }
     }
 
@@ -214,7 +213,7 @@ impl<'a> Builder<'a> {
                 self.flush();
                 self.heading = Some((level as u8, id.map(|id| id.to_string())));
             }
-            Tag::BlockQuote(_) => {
+            Tag::BlockQuote => {
                 self.flush();
                 self.flush_marker();
                 self.quote += 1;
@@ -292,7 +291,7 @@ impl<'a> Builder<'a> {
     fn end(&mut self, tag: TagEnd) {
         match tag {
             TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::HtmlBlock => self.flush(),
-            TagEnd::BlockQuote(_) => {
+            TagEnd::BlockQuote => {
                 self.flush();
                 self.quote = self.quote.saturating_sub(1);
             }

@@ -71,5 +71,5 @@ fn main() -> ExitCode {
 
     // Empty list: GApplication must not parse the command line itself.
     let status = app.run_with_args(&[] as &[&str]);
-    ExitCode::from(status.get())
+    ExitCode::from(i32::from(status) as u8)
 }

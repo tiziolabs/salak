@@ -131,21 +131,23 @@ worth paying.
 
 Consequences:
 
-- Rust dependencies use the versions in Debian unstable: `gtk4 0.11`,
-  `libadwaita 0.9`, `sourceview5 0.11`, `pulldown-cmark 0.13`. Check them
-  again on packages.debian.org before each dependency bump; dependabot must
-  not move a crate past the Debian version (T8.5).
-- `rust-version = "1.85"`, so trixie users can build with the distribution
+- The Rust dependencies use the versions in Debian 13 (trixie), so that
+  trixie can build Salak with its own packages: `gtk4 0.9`, `libadwaita 0.7`,
+  `sourceview5 0.9`, `pulldown-cmark 0.10` (decided on 2026-10-07; they are
+  older than the versions of unstable). Check the versions again on
+  packages.debian.org before each dependency bump; dependabot must not move a
+  crate past the Debian version (T8.5).
+- `salak-gtk` sets `rust-version = "1.85"`, so trixie users can build with the distribution
   compiler.
 - Version features no higher than trixie's system libraries: GTK 4.18,
   libadwaita 1.7. T4.1 checks the exact GtkSourceView version.
 - T4.1 findings (2026-10-05). System libraries were checked on a development
   machine (GTK 4.22, libadwaita 1.9, GtkSourceView 5.18), not yet on a
-  Debian 13 container: do that before T8.3. The `gtk4 0.11` and `glib 0.22`
-  crates require **Rust 1.92**, above trixie's 1.85, so `salak-gtk` sets
-  `rust-version = "1.92"` and cannot be built with trixie's own compiler
-  (1.95 from backports works). Dropping to `gtk4 0.9` would fit trixie but
-  not the sid versions this plan targets; decide before T9.2.
+  Debian 13 container: do that before T8.3. `gtk4 0.11` and `glib 0.22`
+  require Rust 1.92, above trixie's 1.85, so salak-gtk moved to `gtk4 0.9`,
+  `libadwaita 0.7` and `sourceview5 0.9` (MSRV 1.70). Their highest version
+  features are `v4_16` and `v1_6`, a little under trixie's GTK 4.18 and
+  libadwaita 1.7; the code needs nothing newer.
 
 ### D2. Debian Rust packaging rules that shape the code
 
@@ -355,7 +357,7 @@ code they test.
 - **Steps:**
   1. `crates/salak-core/Cargo.toml`: `name = "salak-core"`, library only,
      workspace metadata, `description = "Core of the Salak Markdown reader"`,
-     dependency `pulldown-cmark = { version = "0.13", default-features = false }`,
+     dependency `pulldown-cmark = { version = "0.10", default-features = false }`,
      and `[target.'cfg(windows)'.dependencies] dunce = "1"`.
   2. `src/lib.rs` declaring the modules added by the next tasks.
   3. A private helper `canonicalize(path) -> io::Result<PathBuf>` in
@@ -550,9 +552,9 @@ code they test.
   2. `crates/salak-gtk/Cargo.toml`: `name = "salak-gtk"`,
      `[[bin]] name = "salak"`, workspace metadata, and:
      ```toml
-     gtk = { package = "gtk4", version = "0.11", features = ["v4_18"] }
-     adw = { package = "libadwaita", version = "0.9", features = ["v1_7"] }
-     sourceview5 = { version = "0.11", optional = true }  # version feature per step 1
+     gtk = { package = "gtk4", version = "0.9", features = ["v4_16"] }
+     adw = { package = "libadwaita", version = "0.7", features = ["v1_6"] }
+     sourceview5 = { version = "0.9", optional = true }  # version feature per step 1
      salak-core = { path = "../salak-core", version = "0.1.0" }
 
      [features]

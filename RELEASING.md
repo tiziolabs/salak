@@ -76,6 +76,9 @@ offline from its own packaged crates. So:
 
 - Before raising the version of a dependency of these crates, check that
   Debian unstable has it: `https://packages.debian.org/sid/librust-<crate>-dev`.
+  `gtk4`, `libadwaita`, `sourceview5` and `pulldown-cmark` stay at the
+  versions of Debian 13 (trixie), which Salak supports: see D1 of
+  `docs/gtk-migration-plan.md`.
 - `gtk4`, `libadwaita`, `sourceview5`, `pulldown-cmark`, `glib` and `gio` are
   excluded from dependabot minor and major updates for that reason; patch
   updates are accepted.
