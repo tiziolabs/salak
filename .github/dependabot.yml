@@ -10,8 +10,9 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    # These crates must follow the versions packaged in Debian unstable, see
-    # "Dependencies" in RELEASING.md. Patch updates are still welcome.
+    # These crates must not move past the versions packaged in Debian
+    # unstable, see "Dependencies" in RELEASING.md. Patch updates are still
+    # welcome.
     ignore:
       - dependency-name: "gtk4"
         update-types:

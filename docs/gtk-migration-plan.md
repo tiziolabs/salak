@@ -131,14 +131,14 @@ worth paying.
 
 Consequences:
 
-- The Rust dependencies use the versions in Debian 13 (trixie), so that
-  trixie can build Salak with its own packages: `gtk4 0.9`, `libadwaita 0.7`,
-  `sourceview5 0.9`, `pulldown-cmark 0.10` (decided on 2026-10-07; they are
-  older than the versions of unstable). Check the versions again on
-  packages.debian.org before each dependency bump; dependabot must not move a
-  crate past the Debian version (T8.5).
-- `salak-gtk` sets `rust-version = "1.85"`, so trixie users can build with the distribution
-  compiler.
+- The Rust dependencies follow Debian **unstable**, where new packages enter:
+  `gtk4 0.11`, `libadwaita 0.9`, `sourceview5 0.11`, `pulldown-cmark 0.13`
+  (P2 of [debian-packaging.md](debian-packaging.md), 2026-10-07; this
+  replaces a pin to the older versions of trixie). Check the versions again
+  on packages.debian.org before each dependency bump; dependabot must not
+  move a crate past the Debian version (T8.5).
+- `salak-gtk` sets `rust-version = "1.92"`, required by gtk4 0.11 and
+  glib 0.22. On trixie, build with the rustc of trixie-backports or rustup.
 - Version features no higher than trixie's system libraries: GTK 4.18,
   libadwaita 1.7. T4.1 checks the exact GtkSourceView version.
 - T4.1 findings (2026-10-05). System libraries were checked on a development
@@ -151,10 +151,12 @@ Consequences:
 
 ### D2. Debian Rust packaging rules that shape the code
 
-- Debian packages Rust programs from crates published on crates.io, with
-  `debcargo`. Every dependency must already be packaged in Debian; builds
-  are offline. **salak-core and salak-gtk are published on crates.io.**
-  salak-tauri is not, and is never needed to build salak-gtk.
+- Debian builds Rust programs offline, and every dependency must already be
+  packaged in Debian. Salak is packaged as a standalone source package built
+  with `dh-cargo` from the upstream tarball, not published on crates.io (P3
+  of [debian-packaging.md](debian-packaging.md), which replaces the debcargo
+  plan written here first). salak-tauri is a workspace of its own and is
+  never needed to build salak-gtk.
 - A published crate only contains its own directory: help pages, icons, the
   desktop file, the man page and the metainfo must live **inside** the crate
   that uses them. No `include_str!("../../…")` reaching out of the crate.
@@ -1098,39 +1100,9 @@ code they test.
 
 ### Phase 9: Debian submission preparation
 
-These steps are on the upstream side; the upload itself needs a Debian
-developer (the Debian Rust team) as sponsor.
-
-#### T9.1 Publish the crates
-
-- **Depends on:** T8.4.
-- **Steps:**
-  1. `cargo publish --dry-run -p salak-core`, then `-p salak-gtk`; both
-     packages must build from their tarball alone (help pages and data files
-     included, no path outside the crate).
-  2. Each crate has a `README.md`, `license`, `description`, `repository`,
-     `keywords`, `categories` (`gui`, `text-processing`).
-  3. Publish (after a release tag), salak-core first.
-- **Done when:** both crates are on crates.io and `cargo install salak-gtk`
-  works on Debian 13.
-
-#### T9.2 Debian readiness check
-
-- **Depends on:** T9.1.
-- **Steps:**
-  1. In a Debian unstable container, check that every dependency of
-     salak-core and salak-gtk exists as `librust-*-dev` at a compatible
-     version: `cargo tree -p salak-gtk -e normal --prefix none` against
-     `apt-cache policy librust-<name>-dev`.
-  2. Run `cargo test -p salak-core -p salak-gtk --offline` with Debian's
-     packaged crates (`/usr/share/cargo/registry`, as configured by
-     `debcargo`), without a display (no `DISPLAY` nor `WAYLAND_DISPLAY`).
-  3. Write a DEP-5 `copyright` draft listing every file and its licence
-     (code, icons, help pages, banner image), to hand to the packager.
-  4. File an ITP (Intent To Package) bug with `reportbug wnpp`, or ask on the
-     debian-rust mailing list / `#debian-rust` for a sponsor, pointing to
-     `debcargo-conf`.
-- **Done when:** the ITP is filed with the readiness results attached.
+Replaced by [debian-packaging.md](debian-packaging.md), which follows the
+standalone source package route (no crates.io) and tracks the work up to
+Debian unstable and Ubuntu.
 
 ## 7. Measures
 

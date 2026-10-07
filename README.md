@@ -72,12 +72,16 @@ It also tells how to migrate a `style.css` from version 0.1.0.
 
 Salak needs Debian 13 (trixie), Ubuntu 24.04 or later, or any distribution
 with GTK 4.18 and libadwaita 1.7. Requirements on Linux: a Rust toolchain
-(1.85 or later, see `rust-version` of `salak-gtk`) and the development files of
+(1.92 or later, see `rust-version` of `salak-gtk`) and the development files of
 GTK 4, libadwaita and GtkSourceView. On Debian / Ubuntu:
 
 ```sh
 sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev
 ```
+
+On Debian 13, whose rustc is 1.85, take Rust from the backports
+(`sudo apt install -t trixie-backports rustc cargo`) or from
+[rustup](https://rustup.rs).
 
 On Arch: `sudo pacman -S --needed base-devel gtk4 libadwaita gtksourceview5`.
 
