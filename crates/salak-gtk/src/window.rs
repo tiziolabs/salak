@@ -21,6 +21,53 @@ use crate::monitor;
 use crate::theme::{self, Themer};
 use crate::tree::Tree;
 
+const MIN_SIDEBAR_WIDTH: f64 = 200.0;
+const MAX_SIDEBAR_WIDTH: f64 = 420.0;
+
+/// Wraps the sidebar with a thin handle on its trailing edge. AdwOverlaySplitView
+/// has no user resizing, but it clamps its width between the minimum and the
+/// maximum, so dragging pins both to the wanted width.
+fn sidebar_with_grip(sidebar: &gtk::Box) -> gtk::Overlay {
+    let grip = gtk::Box::builder()
+        .halign(gtk::Align::End)
+        .vexpand(true)
+        .width_request(6)
+        .cursor(&gtk::gdk::Cursor::from_name("col-resize", None).unwrap())
+        .build();
+    let overlay = gtk::Overlay::builder().child(sidebar).build();
+    overlay.add_overlay(&grip);
+
+    let drag = gtk::GestureDrag::new();
+    drag.connect_drag_update(glib::clone!(
+        #[weak]
+        overlay,
+        #[weak]
+        grip,
+        move |drag, dx, _| {
+            let Some(split) = overlay
+                .ancestor(adw::OverlaySplitView::static_type())
+                .and_downcast::<adw::OverlaySplitView>()
+            else {
+                return;
+            };
+            // The grip moves while the sidebar resizes, so its own offsets drift:
+            // locate the pointer in the split view, whose origin stays put.
+            let Some((start_x, start_y)) = drag.start_point() else {
+                return;
+            };
+            let local = gtk::graphene::Point::new((start_x + dx) as f32, start_y as f32);
+            let Some(point) = grip.compute_point(&split, &local) else {
+                return;
+            };
+            let width = f64::from(point.x()).clamp(MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH * 2.0);
+            split.set_max_sidebar_width(width);
+            split.set_min_sidebar_width(width);
+        }
+    ));
+    grip.add_controller(drag);
+    overlay
+}
+
 pub struct Window {
     pub win: adw::ApplicationWindow,
     session: RefCell<Session>,
@@ -153,6 +200,7 @@ impl Window {
         let sidebar = gtk::Box::new(gtk::Orientation::Vertical, 0);
         sidebar.append(&folder);
         sidebar.append(&tree_scroll);
+        let sidebar = sidebar_with_grip(&sidebar);
 
         let tabs = adw::TabView::new();
         let tab_bar = adw::TabBar::builder().view(&tabs).autohide(false).build();
@@ -177,8 +225,8 @@ impl Window {
             .sidebar(&sidebar)
             .content(&content)
             .sidebar_width_fraction(0.25)
-            .min_sidebar_width(200.0)
-            .max_sidebar_width(420.0)
+            .min_sidebar_width(MIN_SIDEBAR_WIDTH)
+            .max_sidebar_width(MAX_SIDEBAR_WIDTH)
             .build();
         let stack = gtk::Stack::new();
         let (welcome, open_button) = welcome();

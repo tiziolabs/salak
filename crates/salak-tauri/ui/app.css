@@ -51,12 +51,27 @@ body.welcome #pane { display: none; }
   width: 260px;
   min-width: 140px;
   max-width: 60vw;
-  resize: horizontal;
   overflow: auto;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
   padding: 6px 0;
 }
+
+#sidebar-grip {
+  flex: 0 0 auto;
+  width: 6px;
+  margin-left: -4px;
+  margin-right: -2px;
+  z-index: 1;
+  cursor: col-resize;
+  touch-action: none;
+}
+#sidebar-grip:hover, #sidebar-grip.dragging { background: var(--accent); opacity: .5; }
+body.dragging-sidebar { cursor: col-resize; user-select: none; }
+
+body.no-sidebar #sidebar-grip,
+body.no-root #sidebar-grip,
+body.welcome #sidebar-grip { display: none; }
 
 #sidebar-header {
   display: flex;

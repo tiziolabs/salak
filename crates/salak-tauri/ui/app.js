@@ -612,6 +612,26 @@ function toggleSidebar() {
 
 for (const button of sidebarToggles) button.addEventListener("click", toggleSidebar);
 
+// Dragging the grip between the sidebar and the content resizes the sidebar.
+const sidebar = document.getElementById("sidebar");
+const grip = document.getElementById("sidebar-grip");
+
+grip.addEventListener("pointerdown", (event) => {
+  grip.setPointerCapture(event.pointerId);
+  grip.classList.add("dragging");
+  document.body.classList.add("dragging-sidebar");
+});
+grip.addEventListener("pointermove", (event) => {
+  if (!grip.hasPointerCapture(event.pointerId)) return;
+  const max = window.innerWidth * 0.6;
+  sidebar.style.width = `${Math.min(Math.max(event.clientX, 140), max)}px`;
+});
+grip.addEventListener("pointerup", (event) => {
+  grip.releasePointerCapture(event.pointerId);
+  grip.classList.remove("dragging");
+  document.body.classList.remove("dragging-sidebar");
+});
+
 document.addEventListener("keydown", (event) => {
   // The welcome page and the about dialog only have their buttons.
   if (!welcome.hidden || aboutDialog.open) return;
