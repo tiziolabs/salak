@@ -1124,6 +1124,10 @@ Ubuntu 26.04; a Debian 13 build has not been done yet. `ldd` counts the
 libraries pulled in transitively, which is why it barely drops although
 the dependency lines are shorter. `cargo-bloat` is not installed and was not run.
 
+On 2026-10-07, after the move to gtk4 0.11 and to the `dist` profile
+(T2.2 of [debian-packaging.md](debian-packaging.md)), the binary of
+`cargo deb -p salak-gtk --profile dist` is 1.02 MB and the `.deb` 353 KiB.
+
 ## 8. What is lost, on purpose
 
 - Arbitrary CSS in themes: replaced by the format of D6, on both platforms.

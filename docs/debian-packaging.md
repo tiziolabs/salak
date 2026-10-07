@@ -161,7 +161,7 @@ Decided on 2026-10-07: the domain `tiziolabs.com` belongs to the author.
 | T1.2 | Move to the crate versions of sid (B1, P2) | done |
 | T1.3 | Update the migration plan, README, RELEASING.md, dependabot | done |
 | T2.1 | Fix the stated minimum systems (R1, R2, P5) | done |
-| T2.2 | Release profile Debian can use (R3) | todo |
+| T2.2 | Release profile Debian can use (R3) | done |
 | T2.3 | Copyright of every file (R4) | todo |
 | T2.4 | OpenPGP key, signed tags and tarball (R5, P6) | todo |
 | T3.1 | metainfo (I1) | todo |

@@ -4,7 +4,7 @@ A release publishes, on the GitHub page of the project:
 
 | File | Built on |
 | --- | --- |
-| `salak_<version>-1_amd64.deb` | Linux, with `cargo deb -p salak-gtk` |
+| `salak_<version>-1_amd64.deb` | Linux, with `cargo deb -p salak-gtk --profile dist` |
 | `Salak_<version>_x64-setup.exe` | Windows, with `scripts\package-windows.ps1` |
 | `salak-<version>-windows-x64-portable.zip` | Windows, same script |
 | Source code (zip and tar.gz) | GitHub, from the tag |
@@ -34,7 +34,7 @@ On Linux, preferably the oldest release to support (see the README):
 
 ```sh
 git checkout v0.1.0
-cargo deb -p salak-gtk
+cargo deb -p salak-gtk --profile dist
 # → target/debian/salak_0.1.0-1_amd64.deb
 ```
 

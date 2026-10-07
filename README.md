@@ -112,9 +112,12 @@ With [cargo-deb](https://crates.io/crates/cargo-deb):
 
 ```sh
 cargo install cargo-deb
-cargo deb -p salak-gtk
+cargo deb -p salak-gtk --profile dist
 sudo apt install ./target/debian/salak_*.deb
 ```
+
+The `dist` profile, defined in the root `Cargo.toml`, makes a smaller binary
+than `release`: stripped, optimized for size, with link-time optimization.
 
 The package installs the binary, a desktop entry that opens Markdown files,
 the AppStream metadata, a man page and the icons. Its dependencies are taken

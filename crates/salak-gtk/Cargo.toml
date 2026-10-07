@@ -27,8 +27,9 @@ default = ["highlight"]
 # Syntax highlighting of code blocks with GtkSourceView.
 highlight = ["dep:sourceview5"]
 
-# `cargo deb -p salak-gtk` builds a Debian package in target/debian/. Man pages
-# are compressed by cargo-deb.
+# `cargo deb -p salak-gtk --profile dist` builds the Debian package of the
+# GitHub releases in target/debian/; cargo-deb reads the binary from the
+# folder of the profile and compresses the man page.
 [package.metadata.deb]
 name = "salak"
 section = "text"

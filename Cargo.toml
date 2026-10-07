@@ -13,8 +13,12 @@ rust-version = "1.77"
 authors = ["Timothe Tizio <t.tizio@mailbox.org>"]
 repository = "https://github.com/tiziolabs/salak"
 
-# Profiles are ignored in member crates, so they live here.
-[profile.release]
+# Profiles are ignored in member crates, so they live here. `release` keeps
+# Cargo's defaults, which distributions expect (Debian keeps the symbols for
+# its -dbgsym packages). The packages of the GitHub releases use `dist`,
+# tuned for size: `cargo deb -p salak-gtk --profile dist`.
+[profile.dist]
+inherits = "release"
 codegen-units = 1
 lto = true
 opt-level = "s"
