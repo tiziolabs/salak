@@ -283,6 +283,9 @@ impl Themer {
         }
         if let Some(size) = theme.font_size {
             font.set_absolute_size(size as f64 * pango::SCALE as f64);
+        } else {
+            // The default size of `document::install_css`.
+            font.set_size((font.size() as f64 * 1.1).round() as i32);
         }
         let layout = view.create_pango_layout(Some("0"));
         layout.set_font_description(Some(&font));

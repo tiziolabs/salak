@@ -51,8 +51,8 @@ impl Document {
             .editable(false)
             .cursor_visible(false)
             .wrap_mode(gtk::WrapMode::WordChar)
-            .top_margin(32)
-            .bottom_margin(32)
+            .top_margin(24)
+            .bottom_margin(24)
             .left_margin(buffer::MARGIN)
             .right_margin(buffer::MARGIN)
             .build();
@@ -333,7 +333,7 @@ pub fn install_css() {
     let provider = gtk::CssProvider::new();
     provider.load_from_string(
         "
-        .md-page { background-color: @view_bg_color; color: @view_fg_color; }
+        .md-page { background-color: @view_bg_color; color: @view_fg_color; font-size: 110%; }
         .md-page textview, .md-page textview text { background: none; color: inherit; }
         .code-block { background: alpha(currentColor, 0.07); border-radius: 6px; }
         .code-block textview, .code-block textview text { background: none; }

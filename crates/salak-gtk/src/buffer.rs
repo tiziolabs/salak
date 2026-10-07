@@ -20,7 +20,7 @@ use crate::theme::Themer;
 
 /// Space left and right of the text, in pixels. A tag's `left-margin` replaces
 /// the one of the view, so paragraphs add it themselves.
-pub const MARGIN: i32 = 40;
+pub const MARGIN: i32 = 28;
 
 pub struct Env {
     pub root: PathBuf,
