@@ -4,8 +4,9 @@ version.workspace = true
 description = "A lightweight Markdown reader, native GTK 4 and libadwaita application"
 license.workspace = true
 edition.workspace = true
-# trixie ships rustc 1.85 and gtk4 0.9 (see D1 of docs/gtk-migration-plan.md).
-rust-version = "1.85"
+# gtk4 0.11 and glib 0.22, the versions of Debian unstable, need Rust 1.92
+# (see P2 of docs/debian-packaging.md).
+rust-version = "1.92"
 authors.workspace = true
 repository.workspace = true
 publish = false
@@ -17,9 +18,9 @@ path = "src/main.rs"
 
 [dependencies]
 salak-core = { path = "../salak-core", version = "0.1.0" }
-gtk = { package = "gtk4", version = "0.9", features = ["v4_16"] }
-adw = { package = "libadwaita", version = "0.7", features = ["v1_6"] }
-sourceview5 = { version = "0.9", optional = true }
+gtk = { package = "gtk4", version = "0.11", features = ["v4_16"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_6"] }
+sourceview5 = { version = "0.11", optional = true }
 
 [features]
 default = ["highlight"]

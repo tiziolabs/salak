@@ -25,7 +25,7 @@ tauri-build = { version = "2", features = [] }
 salak-core = { path = "../salak-core", version = "0.1.0" }
 tauri = { version = "2", features = ["protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
-pulldown-cmark = { version = "0.10", default-features = false, features = ["html"] }
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 ammonia = "4"
 notify = "8"
 tauri-plugin-dialog = "2"

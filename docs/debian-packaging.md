@@ -158,7 +158,7 @@ Decided on 2026-10-07: the domain `tiziolabs.com` belongs to the author.
 | Task | Content | Status |
 | --- | --- | --- |
 | T1.1 | Exclude salak-tauri from the workspace (B2, P4) | done |
-| T1.2 | Move to the crate versions of sid (B1, P2) | todo |
+| T1.2 | Move to the crate versions of sid (B1, P2) | done |
 | T1.3 | Update the migration plan, README, RELEASING.md, dependabot | todo |
 | T2.1 | Fix the stated minimum systems (R1, R2, P5) | todo |
 | T2.2 | Release profile Debian can use (R3) | todo |
