@@ -85,7 +85,9 @@ offline from its own packaged crates. So:
   excluded from dependabot minor and major updates for that reason; patch
   updates are accepted.
 - A new dependency needs a strong reason and must already be in Debian.
-- Do not use system library features newer than GTK 4.18 and libadwaita 1.7
-  (Debian 13).
+- Do not use system library features newer than GTK 4.16 and libadwaita 1.6
+  (the `v4_16` and `v1_6` features of `salak-gtk`). Raising them is possible
+  up to GTK 4.18 and libadwaita 1.7 (Debian 13), together with the minimum
+  versions written in the README and the CHANGELOG.
 
 `salak-tauri` is not packaged by Debian and is free of these rules.

@@ -70,8 +70,9 @@ It also tells how to migrate a `style.css` from version 0.1.0.
 
 ## Building
 
-Salak needs Debian 13 (trixie), Ubuntu 24.04 or later, or any distribution
-with GTK 4.18 and libadwaita 1.7. Requirements on Linux: a Rust toolchain
+Salak needs GTK 4.16 and libadwaita 1.6 or later: Debian 13 (trixie),
+Ubuntu 25.04 or any later release, or another distribution as recent.
+Ubuntu 24.04 is too old. Requirements on Linux: a Rust toolchain
 (1.92 or later, see `rust-version` of `salak-gtk`) and the development files of
 GTK 4, libadwaita and GtkSourceView. On Debian / Ubuntu:
 
