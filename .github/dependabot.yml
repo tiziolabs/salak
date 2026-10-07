@@ -37,3 +37,14 @@ updates:
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
+  # salak-tauri is a workspace of its own, with its own Cargo.lock.
+  - package-ecosystem: "cargo"
+    directory: "/crates/salak-tauri"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    groups:
+      cargo-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"

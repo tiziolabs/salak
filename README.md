@@ -88,8 +88,8 @@ cargo build --release -p salak-gtk
 ./target/release/salak
 ```
 
-Always select one application with `-p`: both produce a binary named `salak`.
-Syntax highlighting of code blocks, done by GtkSourceView, is enabled by
+The root workspace only holds the Linux crates; `salak-tauri` is a workspace
+of its own, in `crates/salak-tauri`. Syntax highlighting of code blocks, done by GtkSourceView, is enabled by
 default; to build without it:
 
 ```sh
@@ -119,8 +119,8 @@ support.
 
 ### Windows
 
-The Windows application is the Tauri one. `cargo build --release -p salak-tauri`
-builds it on any system with the Tauri requirements (on Linux, WebKitGTK), but
+The Windows application is the Tauri one. `cargo build --release` in
+`crates/salak-tauri`, which is a workspace of its own, builds it on any system with the Tauri requirements (on Linux, WebKitGTK), but
 it is only packaged for Windows.
 
 ### Windows installer
@@ -141,13 +141,13 @@ cd crates/salak-tauri
 cargo tauri build
 ```
 
-The installer is written to `target\release\bundle\nsis\`, as
+The installer is written to `crates\salak-tauri\target\release\bundle\nsis\`, as
 `Salak_<version>_x64-setup.exe`. It installs Salak for the current user
 without administrator rights, adds it to the Start menu, offers it to open
 Markdown files, and downloads WebView2 if it is missing. The settings
 specific to Windows are in `tauri.windows.conf.json`.
 
-`target\release\salak.exe` also works on its own, without installing.
+`crates\salak-tauri\target\release\salak.exe` also works on its own, without installing.
 
 The installer is not signed: Windows SmartScreen warns about it on first
 launch ("More info", then "Run anyway").

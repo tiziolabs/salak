@@ -1,3 +1,4 @@
 /target
+/crates/salak-tauri/target
 /crates/salak-tauri/gen/schemas
 /dist

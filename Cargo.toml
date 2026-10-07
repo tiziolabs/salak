@@ -1,5 +1,8 @@
 [workspace]
-members = ["crates/*"]
+# salak-tauri has its own workspace, so that the lock file and the dependency
+# resolution of the Linux crates, packaged by Debian, never see Tauri.
+members = ["crates/salak-core", "crates/salak-gtk"]
+exclude = ["crates/salak-tauri"]
 resolver = "2"
 
 [workspace.package]

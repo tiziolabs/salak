@@ -1,17 +1,22 @@
 [package]
 name = "salak-tauri"
-version.workspace = true
+# Outside the root workspace (see its Cargo.toml): keep these fields in step
+# with its [workspace.package].
+version = "0.1.0"
 description = "A lightweight Markdown reader"
-license.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-authors.workspace = true
-repository.workspace = true
+license = "MIT OR Apache-2.0"
+edition = "2021"
+rust-version = "1.77"
+authors = ["Timothe Tizio <t.tizio@mailbox.org>"]
+repository = "https://github.com/tiziolabs/salak"
 publish = false
 
 [[bin]]
 name = "salak"
 path = "src/main.rs"
+
+# A workspace of its own: its target/ and Cargo.lock live in this folder.
+[workspace]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -35,3 +40,11 @@ custom-protocol = ["tauri/custom-protocol"]
 # Syntax highlighting of code blocks. Disable it for a smaller binary with
 # `cargo build --release -p salak-tauri --no-default-features --features custom-protocol`.
 highlight = ["dep:syntect"]
+
+# Profiles are only read from the workspace root, which is this crate.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

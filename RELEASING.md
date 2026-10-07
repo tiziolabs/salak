@@ -9,13 +9,16 @@ A release publishes, on the GitHub page of the project:
 | `salak-<version>-windows-x64-portable.zip` | Windows, same script |
 | Source code (zip and tar.gz) | GitHub, from the tag |
 
-The version is only written in the root `Cargo.toml` (`[workspace.package]`): the Tauri configuration and the
-packages take it from there.
+The version is written in two places: `[workspace.package]` of the root `Cargo.toml`, for `salak-core` and
+`salak-gtk`, and `[package]` of `crates/salak-tauri/Cargo.toml`, which is a workspace of its own. The Tauri
+configuration and the packages take it from there.
 
 ## 1. Prepare
 
-1. Set `version` in `[workspace.package]` of the root `Cargo.toml`, then run `cargo build -p salak-gtk` to update
-   `Cargo.lock`. Both applications and `salak-core` share this version.
+1. Set the same `version` in `[workspace.package]` of the root `Cargo.toml` and in `crates/salak-tauri/Cargo.toml`
+   (also the `version` of its `salak-core` dependency), then run `cargo build -p salak-gtk` at the root and
+   `cargo build` in `crates/salak-tauri` to update both `Cargo.lock`. Both applications and `salak-core` share
+   this version.
 2. Replace `Unreleased` with the date in `CHANGELOG.md`.
 3. Commit, tag and push:
 
@@ -45,8 +48,8 @@ powershell -ExecutionPolicy Bypass -File scripts\package-windows.ps1
 # → dist\salak-0.1.0-windows-x64-portable.zip
 ```
 
-The Linux build (`salak-gtk`) and the Windows build (`salak-tauri`) are separate:
-never build both in one command, they write the same `target/release/salak`.
+The Linux build (`salak-gtk`) and the Windows build (`salak-tauri`) are separate workspaces, with their own
+`Cargo.lock` and `target/`.
 
 ## 3. Publish
 
