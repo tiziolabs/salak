@@ -1134,13 +1134,21 @@ developer (the Debian Rust team) as sponsor.
 
 | Measure | v0.1.0 (Tauri, Linux) | salak-gtk | salak-gtk without `highlight` |
 | --- | --- | --- | --- |
-| Binary size | | | |
-| `.deb` size | | | |
-| Linked libraries (`ldd \| wc -l`) | | | |
-| `Depends:` | | | |
-| Crates in the dependency tree | 457 (lock file) | | |
-| Memory with `README.md` open | | | |
-| Time to open a 1 MB file (T5.9) | | first paint 56 ms, complete after ~3.5 s | |
+| Binary size | 8.13 MB | 1.01 MB | 1.01 MB |
+| `.deb` size | 2.21 MB | 359 KB | 358 KB |
+| Linked libraries (`ldd \| wc -l`) | 124 | 130 | 129 |
+| `Depends:` | libc6, libcairo2, libdbus-1-3, libgdk-pixbuf-2.0-0, libglib2.0-0t64, libgtk-3-0t64, libjavascriptcoregtk-4.1-0, libsoup-3.0-0, libwebkit2gtk-4.1-0 | libadwaita-1-0, libc6, libglib2.0-0t64, libgtk-4-1, libgtksourceview-5-0, libpango-1.0-0 | libadwaita-1-0, libc6, libglib2.0-0t64, libgtk-4-1, libpango-1.0-0 |
+| Crates in the dependency tree | 457 (lock file of the whole project) | 80 (`cargo tree -p salak-gtk -e normal`, Linux) | 78 |
+| Memory with `README.md` open | 434 MiB (salak 179 + WebKitWebProcess 205 + WebKitNetworkProcess 51) | 156 MiB | 149 MiB |
+| Time to open a 1 MB file (T5.9) | | first paint 56 ms, complete after ~3.5 s | not measured |
+
+Measured on 2026-10-07 on Ubuntu 26.04 (GTK 4.22, libadwaita 1.9,
+GtkSourceView 5.18), Wayland, release builds, resident memory
+(`ps -o rss`) 8 s after start. The `Depends:` lines come from
+`dpkg-shlibdeps` on this machine, so their version bounds are those of
+Ubuntu 26.04; a Debian 13 build has not been done yet. `ldd` counts the
+libraries pulled in transitively, which is why it barely drops although
+the dependency lines are shorter. `cargo-bloat` is not installed and was not run.
 
 ## 8. What is lost, on purpose
 
