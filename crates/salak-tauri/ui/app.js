@@ -485,6 +485,7 @@ async function start(next) {
     article.replaceChildren();
     tree.replaceChildren();
     document.getElementById("open-file").focus();
+    await showRecent();
     return;
   }
   document.getElementById("root-name").textContent = session.root_name;
@@ -500,6 +501,37 @@ async function start(next) {
     moveSelection(0);
     tree.focus();
   }
+}
+
+// Lists the files and folders opened lately on the welcome page.
+async function showRecent() {
+  const section = document.getElementById("recent");
+  let entries = [];
+  try {
+    entries = await invoke("recent_paths");
+  } catch (err) {
+    console.error(err);
+  }
+  section.hidden = entries.length === 0;
+  document.getElementById("recent-list").replaceChildren(
+    ...entries.map((entry) => {
+      const li = document.createElement("li");
+      const button = document.createElement("button");
+      button.title = entry.path;
+      const name = document.createElement("span");
+      name.className = "recent-name";
+      name.textContent = (entry.is_dir ? "\u{1F4C1} " : "\u{1F4C4} ") + entry.name;
+      const parent = document.createElement("span");
+      parent.className = "recent-parent";
+      parent.textContent = entry.parent;
+      button.append(name, parent);
+      button.addEventListener("click", () =>
+        openPath(entry.path).catch((err) => showMessage(String(err))),
+      );
+      li.append(button);
+      return li;
+    }),
+  );
 }
 
 async function openPath(path) {

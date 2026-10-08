@@ -12,6 +12,7 @@ use gtk::{gio, glib};
 use salak_core::files::{self, MARKDOWN_EXTENSIONS};
 use salak_core::help;
 use salak_core::markdown::Link;
+use salak_core::recent;
 use salak_core::session::{window_title, Session};
 
 use crate::actions;
@@ -128,8 +129,9 @@ fn primary_menu() -> gio::Menu {
     menu
 }
 
-/// The welcome page, shown while no folder is open, and its first button.
-fn welcome() -> (adw::StatusPage, gtk::Button) {
+/// The welcome page, shown while no folder is open, its first button and the
+/// list of recent files and folders.
+fn welcome() -> (adw::StatusPage, gtk::Button, gtk::ListBox) {
     let open_file = gtk::Button::builder()
         .label("Open File…")
         .action_name("win.open-file")
@@ -160,15 +162,37 @@ fn welcome() -> (adw::StatusPage, gtk::Button) {
         .orientation(gtk::Orientation::Vertical)
         .spacing(18)
         .build();
+    let recent = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .css_classes(["boxed-list"])
+        .build();
+    let recent_title = gtk::Label::builder()
+        .label("Recent")
+        .xalign(0.0)
+        .css_classes(["heading"])
+        .build();
+    let recent_group = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
+        // Shown by `fill_recent` when there is something to list.
+        .visible(false)
+        .build();
+    recent_group.append(&recent_title);
+    recent_group.append(&recent);
+    let clamp = adw::Clamp::builder()
+        .maximum_size(460)
+        .child(&recent_group)
+        .build();
     content.append(&buttons);
     content.append(&guide);
+    content.append(&clamp);
     let page = adw::StatusPage::builder()
         .icon_name(crate::APP_ID)
         .title("Salak")
         .description("Open a Markdown file, or a folder to browse its files.")
         .child(&content)
         .build();
-    (page, open_file)
+    (page, open_file, recent)
 }
 
 impl Window {
@@ -229,7 +253,7 @@ impl Window {
             .max_sidebar_width(MAX_SIDEBAR_WIDTH)
             .build();
         let stack = gtk::Stack::new();
-        let (welcome, open_button) = welcome();
+        let (welcome, open_button, recent_list) = welcome();
         stack.add_named(&welcome, Some("welcome"));
         stack.add_named(&split, Some("main"));
 
@@ -348,6 +372,9 @@ impl Window {
             let session = this.session.borrow();
             (session.root.clone(), session.initial.clone())
         };
+        if let Some(target) = initial.as_ref().or(root.as_ref()) {
+            recent::record(target);
+        }
         if let Some(root) = root {
             glib::spawn_future_local(glib::clone!(
                 #[strong]
@@ -367,11 +394,47 @@ impl Window {
                 }
             ));
         } else {
+            this.fill_recent(&recent_list);
             this.stack.set_visible_child_name("welcome");
             GtkWindowExt::set_focus(&this.win, Some(&open_button));
         }
         this.win.present();
         this
+    }
+
+    /// Lists the recent files and folders on the welcome page.
+    fn fill_recent(self: &Rc<Self>, list: &gtk::ListBox) {
+        let entries = recent::load();
+        if let Some(group) = list.parent() {
+            group.set_visible(!entries.is_empty());
+        }
+        for path in entries {
+            let name = path.file_name().unwrap_or(path.as_os_str());
+            let location = path.parent().unwrap_or(&path);
+            let row = adw::ActionRow::builder()
+                .title(glib::markup_escape_text(&name.to_string_lossy()))
+                .subtitle(glib::markup_escape_text(&location.to_string_lossy()))
+                .subtitle_lines(1)
+                .tooltip_text(path.to_string_lossy())
+                .activatable(true)
+                .build();
+            let icon = if path.is_dir() {
+                "folder-symbolic"
+            } else {
+                "text-x-generic-symbolic"
+            };
+            row.add_prefix(&gtk::Image::from_icon_name(icon));
+            row.connect_activated(glib::clone!(
+                #[strong(rename_to = this)]
+                self,
+                move |_| {
+                    let this = this.clone();
+                    let path = path.clone();
+                    glib::spawn_future_local(async move { this.open_path(&path).await });
+                }
+            ));
+            list.append(&row);
+        }
     }
 
     /// Applies the theme again, with no banner, whenever its file is saved.
@@ -640,6 +703,7 @@ impl Window {
             Ok(opened) => opened,
             Err(err) => return self.toast(&err),
         };
+        recent::record(opened.file.as_ref().unwrap_or(&opened.root));
         if opened.root_changed {
             self.close_all_tabs();
             self.show_root(opened.root).await;

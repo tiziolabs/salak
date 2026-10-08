@@ -354,6 +354,55 @@ body.no-root #show-sidebar { display: none; }
   color: var(--muted);
 }
 
+#welcome #recent {
+  width: min(460px, 100%);
+  margin-top: 24px;
+  text-align: left;
+}
+
+#welcome #recent[hidden] { display: none; }
+
+#welcome #recent h2 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+#welcome #recent ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+#welcome #recent li + li { border-top: 1px solid var(--border); }
+
+#welcome #recent button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+#welcome #recent button:hover { background: var(--hover); }
+
+#welcome .recent-parent {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 #about {
   width: 320px;
   padding: 24px 24px 20px;

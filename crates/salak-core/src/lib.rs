@@ -7,6 +7,7 @@ pub mod cli;
 pub mod files;
 pub mod help;
 pub mod markdown;
+pub mod recent;
 pub mod session;
 pub mod theme;
 

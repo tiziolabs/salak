@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The welcome page lists the last files and folders opened.
 - **Linux:** Salak is now a native GTK 4 and libadwaita application, without
   WebKitGTK. It needs GTK 4.16 and libadwaita 1.6 (Debian 13 or later,
   Ubuntu 25.04 or later). Raw HTML in Markdown is no longer rendered, except

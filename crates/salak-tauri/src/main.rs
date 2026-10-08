@@ -13,7 +13,7 @@ use std::sync::Mutex;
 
 use salak_core::about::About;
 use salak_core::session::{window_title, Session};
-use salak_core::{cli, files, help, theme};
+use salak_core::{cli, files, help, recent, theme};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -62,6 +62,28 @@ fn session(state: State<AppState>) -> SessionDto {
     SessionDto::new(&session, session.initial.as_deref())
 }
 
+/// A file or a folder opened lately, as the welcome page lists it.
+#[derive(Serialize)]
+struct RecentDto {
+    path: String,
+    name: String,
+    parent: String,
+    is_dir: bool,
+}
+
+#[tauri::command]
+fn recent_paths() -> Vec<RecentDto> {
+    recent::load()
+        .into_iter()
+        .map(|path| RecentDto {
+            name: lossy(Path::new(path.file_name().unwrap_or(path.as_os_str()))),
+            parent: path.parent().map(lossy).unwrap_or_default(),
+            is_dir: path.is_dir(),
+            path: lossy(&path),
+        })
+        .collect()
+}
+
 fn current_root(state: &AppState) -> Result<PathBuf, String> {
     state
         .session
@@ -82,6 +104,7 @@ async fn open_path(
 ) -> Result<SessionDto, String> {
     let mut session = state.session.lock().unwrap();
     let opened = session.open(&path)?;
+    recent::record(opened.file.as_deref().unwrap_or(&opened.root));
     // Lets the webview load images located in the new folder.
     window
         .asset_protocol_scope()
@@ -287,6 +310,9 @@ fn open_url(url: String) -> Result<(), String> {
 
 fn state_from_args(path: Option<PathBuf>, theme: Option<PathBuf>) -> Result<AppState, String> {
     let session = Session::from_args(path)?;
+    if let Some(target) = session.initial.as_ref().or(session.root.as_ref()) {
+        recent::record(target);
+    }
     // An explicit theme must exist, the default one is optional.
     let theme = match theme {
         Some(theme) => Some(theme::explicit_path(&theme)?),
@@ -372,6 +398,7 @@ fn main() {
             close_document,
             open_path,
             pick,
+            recent_paths,
             open_help,
             about,
             open_url,

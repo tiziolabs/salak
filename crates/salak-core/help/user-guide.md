@@ -10,6 +10,11 @@ in a tree, and renders the selected one.
   folder.
 - **File › Open Folder…** (`Ctrl+Shift+O`) browses another folder.
 
+The welcome page lists the last ten files and folders opened this way or from
+the command line, most recent first. Click one to open it again. Entries that
+no longer exist are left out. The list is kept in
+`$XDG_STATE_HOME/salak/recent` (`~/.local/state/salak/recent`).
+
 From a terminal:
 
 ```sh
