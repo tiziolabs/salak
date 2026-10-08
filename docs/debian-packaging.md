@@ -162,7 +162,7 @@ Decided on 2026-10-07: the domain `tiziolabs.com` belongs to the author.
 | T1.3 | Update the migration plan, README, RELEASING.md, dependabot | done |
 | T2.1 | Fix the stated minimum systems (R1, R2, P5) | done |
 | T2.2 | Release profile Debian can use (R3) | done |
-| T2.3 | Copyright of every file (R4) | todo |
+| T2.3 | Copyright of every file (R4) | done upstream; `debian/copyright` in T4.2 |
 | T2.4 | OpenPGP key, signed tags and tarball (R5, P6) | todo |
 | T3.1 | metainfo (I1) | todo |
 | T3.2 | Desktop file (I2) | todo |
@@ -442,6 +442,7 @@ Decided on 2026-10-07: the domain `tiziolabs.com` belongs to the author.
 
 ## 7. Open questions
 
-- Licence of the artwork (T2.3): same as the code, or a Creative Commons
-  licence.
+- ~~Licence of the artwork (T2.3)~~: answered on 2026-10-08, the icon and the
+  banner are original works of the author, under MIT OR Apache-2.0 like the
+  code. The banner has no other source than its PNG; it is not installed.
 - Ubuntu crate versions (T5.1): they decide whether the PPA needs vendoring.
