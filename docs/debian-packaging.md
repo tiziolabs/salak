@@ -163,7 +163,7 @@ Decided on 2026-10-07: the domain `tiziolabs.com` belongs to the author.
 | T2.1 | Fix the stated minimum systems (R1, R2, P5) | done |
 | T2.2 | Release profile Debian can use (R3) | done |
 | T2.3 | Copyright of every file (R4) | done upstream; `debian/copyright` in T4.2 |
-| T2.4 | OpenPGP key, signed tags and tarball (R5, P6) | todo |
+| T2.4 | OpenPGP key, signed tags and tarball (R5, P6) | procedure written; key to create |
 | T3.1 | metainfo (I1) | todo |
 | T3.2 | Desktop file (I2) | todo |
 | T3.3 | Man page (I3) | todo |
