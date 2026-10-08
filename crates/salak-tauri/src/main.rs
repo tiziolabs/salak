@@ -345,6 +345,12 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &MenuItem::with_id(app, "quit", "&Quit", true, Some("CmdOrCtrl+Q"))?,
         ],
     )?;
+    let edit = Submenu::with_items(
+        app,
+        "&Edit",
+        true,
+        &[&MenuItem::with_id(app, "find", "&Find…", true, Some("CmdOrCtrl+F"))?],
+    )?;
     let help = Submenu::with_items(
         app,
         "&Help",
@@ -356,7 +362,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &MenuItem::with_id(app, "about", "&About Salak", true, None::<&str>)?,
         ],
     )?;
-    Menu::with_items(app, &[&file, &help])
+    Menu::with_items(app, &[&file, &edit, &help])
 }
 
 /// Tiling compositors (sway, i3, Hyprland) manage window chrome themselves:

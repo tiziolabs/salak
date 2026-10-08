@@ -6,6 +6,7 @@ mod highlight;
 mod keys;
 mod layout;
 mod monitor;
+mod search;
 mod theme;
 mod tree;
 mod window;

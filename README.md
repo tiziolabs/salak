@@ -56,6 +56,7 @@ salak --theme dark.ini  # use another theme
 | `r`, `F5`, `Ctrl+R` | Reload the document |
 | `Esc` | Dismiss the "file changed" banner |
 | `b`, `Ctrl+B` | Toggle the sidebar |
+| `Ctrl+F`, `/` | Find in the document: `Enter` / `Shift+Enter` for the next / previous match, `Esc` to close |
 
 ## Custom theme
 

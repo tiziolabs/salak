@@ -192,3 +192,7 @@ tr:nth-child(2n) { background: var(--subtle-bg); }
   color: var(--muted);
   text-align: center;
 }
+
+/* Find in document: see find() in app.js. */
+::highlight(find-match) { background-color: rgba(255, 200, 0, .4); color: inherit; }
+::highlight(find-current) { background-color: rgba(255, 128, 0, .7); color: inherit; }

@@ -257,6 +257,48 @@ body.no-root #show-sidebar { display: none; }
 #tab-menu button:focus-visible { background: var(--selected); outline: none; }
 #tab-menu button:disabled { color: var(--muted); opacity: .6; cursor: default; }
 
+#find {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar-bg);
+}
+
+#find[hidden] { display: none; }
+
+#find-input {
+  flex: 0 1 320px;
+  font: inherit;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+#find-input.none { border-color: #cf222e; }
+
+#find-count {
+  min-width: 7ch;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#find button {
+  font: inherit;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+#find button:hover:enabled { background: var(--hover); }
+#find button:disabled { color: var(--muted); opacity: .6; cursor: default; }
+
 #content {
   flex: 1 1 auto;
   min-height: 0;

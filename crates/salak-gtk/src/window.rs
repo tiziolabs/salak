@@ -19,6 +19,7 @@ use crate::actions;
 use crate::document::{self, Document};
 use crate::keys;
 use crate::monitor;
+use crate::search::{self, Search};
 use crate::theme::{self, Themer};
 use crate::tree::Tree;
 
@@ -82,6 +83,7 @@ pub struct Window {
     pages: gtk::Stack,
     /// Banner shown when the open file changed on disk.
     banner: adw::Banner,
+    pub search: Rc<Search>,
     themer: Rc<Themer>,
     /// Watches the theme file, for live editing.
     theme_monitor: RefCell<Option<gio::FileMonitor>>,
@@ -118,6 +120,9 @@ fn primary_menu() -> gio::Menu {
     files.append(Some("Open Folder…"), Some("win.open-folder"));
     files.append(Some("Close Tab"), Some("win.close-tab"));
     menu.append_section(None, &files);
+    let find = gio::Menu::new();
+    find.append(Some("Find…"), Some("win.find"));
+    menu.append_section(None, &find);
     let help = gio::Menu::new();
     help.append(Some("User Guide"), Some("win.help('user-guide')"));
     help.append(Some("Theming Guide"), Some("win.help('theming')"));
@@ -242,7 +247,9 @@ impl Window {
         pages.add_named(&tabs, Some("tabs"));
         pages.add_named(&hint, Some("hint"));
         content.append(&tab_bar);
+        let search = Search::new();
         content.append(&banner);
+        content.append(&search.bar);
         content.append(&pages);
 
         let split = adw::OverlaySplitView::builder()
@@ -315,6 +322,7 @@ impl Window {
             tabs,
             pages,
             banner,
+            search,
             themer,
             theme_monitor: RefCell::default(),
             monitor: RefCell::default(),
@@ -329,6 +337,7 @@ impl Window {
         this.watch_theme(theme_path);
         actions::install(&this, app);
         keys::install(&this);
+        search::install(&this);
 
         this.tree.connect_open(glib::clone!(
             #[weak]
@@ -505,6 +514,7 @@ impl Window {
     fn selection_changed(self: &Rc<Self>) {
         self.update_selection();
         self.banner.set_revealed(false);
+        self.research();
         if let Some(monitor) = self.monitor.take() {
             monitor.cancel();
         }
@@ -531,6 +541,10 @@ impl Window {
         let empty = self.tabs.n_pages() == 0;
         self.pages
             .set_visible_child_name(if empty { "hint" } else { "tabs" });
+        self.set_find_enabled(!empty);
+        if empty {
+            self.search.close();
+        }
         if empty && self.session.borrow().root.is_none() {
             self.stack.set_visible_child_name("welcome");
         }
@@ -574,6 +588,7 @@ impl Window {
             self.linker(true),
         );
         self.hashes.borrow_mut().insert(key, hash);
+        self.research();
     }
 
     /// Reloads the document of the selected tab.
@@ -585,6 +600,28 @@ impl Window {
         {
             let this = self.clone();
             glib::spawn_future_local(async move { this.refresh(path, true).await });
+        }
+    }
+
+    /// Opens the search bar on the selected document.
+    pub fn find(&self) {
+        if self.document().is_some() {
+            self.search.open();
+        }
+    }
+
+    /// Looks for the query again in the selected document.
+    pub fn research(&self) {
+        self.search.update(self.document().as_ref());
+    }
+
+    pub fn set_find_enabled(&self, enabled: bool) {
+        if let Some(action) = self
+            .win
+            .lookup_action("find")
+            .and_downcast::<gio::SimpleAction>()
+        {
+            action.set_enabled(enabled);
         }
     }
 

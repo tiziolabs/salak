@@ -63,6 +63,7 @@ the background is read again when it is brought back to the front.
 | `r`, `F5`, `Ctrl+R` | Reload the document |
 | `Esc` | Dismiss the "file changed" banner |
 | `b`, `Ctrl+B` | Toggle the sidebar |
+| `Ctrl+F`, `/` | Find in the document: `Enter` / `Shift+Enter` for the next / previous match, `Esc` to close |
 
 ## Appearance
 

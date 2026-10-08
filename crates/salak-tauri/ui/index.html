@@ -45,6 +45,13 @@
       </button>
       <div id="tabs" role="tablist"></div>
     </div>
+    <form id="find" role="search" hidden>
+      <input id="find-input" type="search" placeholder="Find in document" aria-label="Find in document" autocomplete="off" spellcheck="false">
+      <span id="find-count" aria-live="polite"></span>
+      <button type="button" id="find-prev" title="Previous match (Shift+Enter)" aria-label="Previous match">↑</button>
+      <button type="button" id="find-next" title="Next match (Enter)" aria-label="Next match">↓</button>
+      <button type="button" id="find-close" title="Close (Esc)" aria-label="Close the search">×</button>
+    </form>
     <main id="content" tabindex="-1">
       <div id="banner" role="alert" hidden></div>
       <div id="doc"></div>

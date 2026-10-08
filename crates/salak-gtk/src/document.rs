@@ -233,6 +233,30 @@ impl Document {
         self.view.grab_focus();
     }
 
+    /// The text view of the document.
+    pub fn view(&self) -> &gtk::TextView {
+        &self.view
+    }
+
+    /// The text views to search: the document, then the code blocks embedded
+    /// in it, with the offset of the anchor that holds each.
+    pub fn text_views(&self) -> Vec<(gtk::TextView, Option<i32>)> {
+        let mut views = vec![(self.view.clone(), None)];
+        let buffer = self.view.buffer();
+        let mut iter = buffer.start_iter();
+        loop {
+            if let Some(anchor) = iter.child_anchor() {
+                for widget in anchor.widgets() {
+                    nested_views(&widget, iter.offset(), &mut views);
+                }
+            }
+            if !iter.forward_find_char(|c| c == '\u{FFFC}', None) {
+                break;
+            }
+        }
+        views
+    }
+
     /// Scrolls by `delta` pixels.
     pub fn scroll_by(&self, delta: f64) {
         let adjustment = self.widget.vadjustment();
@@ -252,6 +276,18 @@ impl Document {
     /// Scrolls to a heading or an anchor, once it is drawn.
     pub fn scroll_to(&self, id: &str) {
         scroll_to(&self.view, &self.loading, id);
+    }
+}
+
+fn nested_views(widget: &gtk::Widget, at: i32, views: &mut Vec<(gtk::TextView, Option<i32>)>) {
+    if let Some(view) = widget.downcast_ref::<gtk::TextView>() {
+        views.push((view.clone(), Some(at)));
+        return;
+    }
+    let mut child = widget.first_child();
+    while let Some(widget) = child {
+        nested_views(&widget, at, views);
+        child = widget.next_sibling();
     }
 }
 

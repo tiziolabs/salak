@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Find in the document with `Ctrl+F`, `/` or the menu. Matches are
+  highlighted. On Linux, the cells of tables are not searched yet.
 - The welcome page lists the last files and folders opened.
 - **Linux:** Salak is now a native GTK 4 and libadwaita application, without
   WebKitGTK. It needs GTK 4.16 and libadwaita 1.6 (Debian 13 or later,

@@ -16,6 +16,7 @@ const ACCELS: &[(&str, &[&str])] = &[
     ("win.open-file", &["<Ctrl>o"]),
     ("win.open-folder", &["<Ctrl><Shift>o"]),
     ("win.close-tab", &["<Ctrl>w"]),
+    ("win.find", &["<Ctrl>f"]),
     ("win.reload", &["F5", "<Ctrl>r"]),
     ("win.toggle-sidebar", &["<Ctrl>b"]),
     ("win.help('user-guide')", &["F1"]),
@@ -48,6 +49,13 @@ pub fn install(window: &Rc<Window>, app: &adw::Application) {
                 #[weak]
                 window,
                 move |_: &adw::ApplicationWindow, _, _| window.close_tab()
+            ))
+            .build(),
+        gio::ActionEntry::builder("find")
+            .activate(clone!(
+                #[weak]
+                window,
+                move |_: &adw::ApplicationWindow, _, _| window.find()
             ))
             .build(),
         gio::ActionEntry::builder("toggle-sidebar")
@@ -87,6 +95,8 @@ pub fn install(window: &Rc<Window>, app: &adw::Application) {
     ];
     window.win.add_action_entries(entries);
     install_tab_menu(window);
+    // Nothing to search until a document is open.
+    window.set_find_enabled(false);
 
     for (action, accels) in ACCELS {
         app.set_accels_for_action(action, accels);

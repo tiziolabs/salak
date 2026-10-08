@@ -41,6 +41,7 @@ fn pressed(window: &Rc<Window>, key: Key, state: ModifierType) -> bool {
     match key {
         Key::r => window.reload(),
         Key::b => window.toggle_sidebar(),
+        Key::slash => window.find(),
         Key::Escape if window.banner_revealed() => window.dismiss_banner(),
         Key::Tab if !state.contains(ModifierType::SHIFT_MASK) => {
             if focus == Focus::Tree || !window.sidebar_shown() {

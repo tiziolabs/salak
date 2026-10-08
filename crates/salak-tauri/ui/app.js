@@ -175,6 +175,7 @@ function showMessage(text) {
   p.className = "placeholder";
   p.textContent = text;
   article.replaceChildren(p);
+  find();
 }
 
 function scrollToId(id) {
@@ -189,6 +190,7 @@ function showDocument(doc) {
   template.innerHTML = doc.html;
   article.replaceChildren(template.content);
   markActive(current);
+  find();
 }
 
 // Help pages are embedded in the binary and use `help:<name>` as path.
@@ -197,6 +199,98 @@ function load(path) {
     ? invoke("open_help", { name: path.slice(5) })
     : invoke("open_file", { path });
 }
+
+// ---------------------------------------------------------------- find
+
+const findBar = document.getElementById("find");
+const findInput = document.getElementById("find-input");
+const findCount = document.getElementById("find-count");
+const findButtons = [document.getElementById("find-prev"), document.getElementById("find-next")];
+
+// The matches of the query in the document, as ranges, and the current one.
+let matches = [];
+let currentMatch = 0;
+// Highlights need no change to the document; WebView2 supports them.
+const matchHighlight = window.Highlight ? new Highlight() : null;
+const currentHighlight = window.Highlight ? new Highlight() : null;
+if (matchHighlight) {
+  CSS.highlights.set("find-match", matchHighlight);
+  CSS.highlights.set("find-current", currentHighlight);
+}
+
+function clearFind() {
+  matches = [];
+  matchHighlight?.clear();
+  currentHighlight?.clear();
+  findCount.textContent = "";
+  findInput.classList.remove("none");
+  for (const button of findButtons) button.disabled = true;
+}
+
+// Looks for the query again in the document, from its first occurrence.
+function find() {
+  clearFind();
+  const query = findInput.value.toLowerCase();
+  if (findBar.hidden || !query) return;
+  const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node && matches.length < 10000; node = walker.nextNode()) {
+    const text = node.data.toLowerCase();
+    for (let at = text.indexOf(query); at >= 0; at = text.indexOf(query, at + query.length)) {
+      const range = new Range();
+      range.setStart(node, at);
+      range.setEnd(node, at + query.length);
+      matches.push(range);
+    }
+  }
+  matchHighlight?.add(...matches);
+  findInput.classList.toggle("none", matches.length === 0);
+  for (const button of findButtons) button.disabled = matches.length === 0;
+  if (matches.length === 0) findCount.textContent = "No results";
+  else showMatch(0);
+}
+
+function showMatch(index) {
+  currentMatch = index;
+  currentHighlight?.clear();
+  currentHighlight?.add(matches[index]);
+  findCount.textContent = `${index + 1} of ${matches.length}`;
+  const rect = matches[index].getBoundingClientRect();
+  const view = content.getBoundingClientRect();
+  if (rect.top < view.top + view.height * 0.1 || rect.bottom > view.top + view.height * 0.9) {
+    content.scrollBy(0, rect.top - view.top - view.height * 0.3);
+  }
+}
+
+function stepMatch(delta) {
+  if (matches.length) showMatch((currentMatch + delta + matches.length) % matches.length);
+}
+
+function openFind() {
+  if (!active) return;
+  findBar.hidden = false;
+  findInput.focus();
+  findInput.select();
+  find();
+}
+
+function closeFind() {
+  findBar.hidden = true;
+  clearFind();
+  content.focus();
+}
+
+findInput.addEventListener("input", find);
+findInput.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeFind();
+  else if (event.key === "Enter") stepMatch(event.shiftKey ? -1 : 1);
+  else return;
+  event.preventDefault();
+});
+findButtons[0].addEventListener("click", () => stepMatch(-1));
+findButtons[1].addEventListener("click", () => stepMatch(1));
+document.getElementById("find-close").addEventListener("click", closeFind);
+// The form never submits: Enter is handled above.
+findBar.addEventListener("submit", (event) => event.preventDefault());
 
 // ---------------------------------------------------------------- tabs
 
@@ -312,6 +406,7 @@ function closeTabs(closing) {
   active = null;
   current = null;
   loads++;
+  findBar.hidden = true;
   renderTabs();
   banner.hidden = true;
   markActive(null);
@@ -609,6 +704,7 @@ listen("menu", (event) => {
   if (id === "open-file") pick(false);
   else if (id === "open-folder") pick(true);
   else if (id === "close-tab" && active) closeTabs([active]);
+  else if (id === "find") openFind();
   else if (id === "about") showAbout();
   else if (id.startsWith("help:")) openHelp(id.slice(5));
 });
@@ -668,6 +764,8 @@ document.addEventListener("keydown", (event) => {
   // The welcome page and the about dialog only have their buttons.
   if (!welcome.hidden || aboutDialog.open) return;
   const ctrl = event.ctrlKey || event.metaKey;
+  // The keys of the search field are its own.
+  if (event.target === findInput && !(ctrl && event.key === "f")) return;
   if (!tabMenu.hidden) {
     if (event.key === "Escape") hideTabMenu(true);
     else if (event.key === "ArrowDown") moveInTabMenu(1);
@@ -683,6 +781,8 @@ document.addEventListener("keydown", (event) => {
     reload();
   } else if (event.key === "Escape" && !banner.hidden) {
     banner.hidden = true;
+  } else if ((ctrl && event.key === "f") || (event.key === "/" && !ctrl && !event.altKey)) {
+    openFind();
   } else if (event.key === "b" && !event.altKey) {
     toggleSidebar();
   } else if (content.contains(document.activeElement) && !ctrl && !event.altKey && scrollContent(event.key)) {
