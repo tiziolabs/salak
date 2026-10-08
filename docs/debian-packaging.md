@@ -95,6 +95,16 @@ on 2026-10-07, 26.04 LTS and 26.10 (released this month). 25.10 reached its
 end of life in July 2026; 24.04 and 22.04 are too old (P5). No
 trixie-backports.
 
+Ubuntu archive, checked on launchpad.net on 2026-10-08 (T5.1):
+
+| Release | `rust-gtk4` | `rust-libadwaita` | `rust-sourceview5` | `rust-pulldown-cmark` | rustc | debhelper compat | PPA build |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 26.04 resolute | 0.10.3 | 0.8.1 | 0.10.0 | 0.13.0 | 1.93 | up to 13 | vendored crates, branch `ubuntu/resolute-ppa` |
+| 26.10 stonking | 0.11.5 | 0.9.2 | 0.11.2 | 0.13.3 | 1.97 | 14 | the Debian packaging as is |
+
+26.10 is in its pre-release freeze, so the sync from Debian (T5.2) will reach
+27.04 first.
+
 ### P2. Follow the crate versions of sid; MSRV 1.92
 
 Decided on 2026-10-07, replaces the first consequence of D1 of the migration
@@ -135,8 +145,12 @@ the documentation together.
 
 Decided on 2026-10-07. A new OpenPGP key signs the release tags and a
 `salak-<version>.tar.gz` made with `git archive`, attached to the GitHub
-release with its `.asc`. `debian/watch` downloads that tarball and checks it
-with the key, shipped as `debian/upstream/signing-key.asc`.
+release with its `.asc`, for users and other distributions.
+
+Refined on 2026-10-08: `debian/watch` (format 5) tracks the signed git tags
+(`Mode: git`, `Pgp-Mode: gittag`) rather than the tarball, because the
+GitHub release page loads its assets lazily and uscan cannot see them. The
+key is shipped as `debian/upstream/signing-key.asc`.
 
 ### P7. The application id stays `com.tiziolabs.salak`
 
@@ -156,6 +170,7 @@ Folders are opened from Salak itself or with `salak DIR`.
   `cargo test -p salak-core -p salak-gtk` pass, `CHANGELOG.md` updated.
 - Debian work is checked in a **Debian unstable container** (podman or
   docker `debian:sid`), never only on the development machine (Ubuntu 26.04).
+  The script of T4.2 does the whole check.
 - Every version number written here is checked on sources.debian.org or
   launchpad.net, with the date.
 - When a task changes a decision, update section 3 and the migration plan.
@@ -175,12 +190,12 @@ Folders are opened from Salak itself or with `salak DIR`.
 | T3.2 | Desktop file (I2) | dropped, see P8 |
 | T3.3 | Man page (I3) | done |
 | T3.4 | Packager notes (I5) | done |
-| T4.1 | Upstream release 0.2.0 | todo |
-| T4.2 | Debian source package on Salsa | todo |
-| T4.3 | ITP bug | todo |
-| T4.4 | Upload to mentors.debian.net and RFS | todo |
+| T4.1 | Upstream release 0.2.0 | todo: needs the key of T2.4 |
+| T4.2 | Debian source package on Salsa | packaging done and checked locally; Salsa, key and ITP number to add |
+| T4.3 | ITP bug | draft below; to send |
+| T4.4 | Upload to mentors.debian.net and RFS | draft below; after T4.1 to T4.3 |
 | T4.5 | Follow-up until unstable and testing | todo |
-| T5.1 | Launchpad PPA | todo |
+| T5.1 | Launchpad PPA | both builds checked locally; PPA to create and upload |
 | T5.2 | Ubuntu sync | todo |
 
 ## 6. Tasks
@@ -386,6 +401,38 @@ Folders are opened from Salak itself or with `salak DIR`.
      `lintian -EvIL +pedantic` and fix every error and warning that applies.
 - **Done when:** sbuild, lintian (no error, no warning) and autopkgtest pass,
   and Salsa CI is green.
+- **State on 2026-10-08:** the packaging is in `~/workspace/salak-debian`
+  (git, branch `debian/latest`, `debian/` only until the first
+  `gbp import-orig`). Built from a `git archive` of upstream `HEAD` named
+  0.2.0, in `debian:sid` and in `ubuntu:26.10`:
+  - `debian/rules` drives the Debian cargo wrapper itself
+    (`/usr/share/cargo/bin/cargo`): the dh-cargo build system targets crates
+    of crates.io and its `cargo install` cannot build one member of a
+    workspace. The upstream `Cargo.lock` is set aside during the build and
+    put back by `clean`. `dh-cargo-built-using` fills `Built-Using` and
+    `Static-Built-Using`.
+  - `debhelper-compat (= 14)`, `Standards-Version: 4.7.4`, `-dbgsym`
+    package produced, `Depends` from `dpkg-shlibdeps` only.
+  - autopkgtest passes: the tests of salak-core and salak-gtk against the
+    installed crates, and `salak --version`.
+  - `lintian -EvIL +pedantic` leaves only what needs the author:
+    `debian-watch-file-pubkey-file-is-missing` (T2.4),
+    `initial-upload-closes-no-bugs` and `wrong-bug-number-in-closes`
+    (T4.3). Placeholders to replace: `ITP_BUG` in `debian/changelog`,
+    `SALSA_USER` in `Vcs-*` of `debian/control`.
+  - Check script, run from a folder holding `salak_<version>.orig.tar.gz`
+    and a copy of `debian/` (`debian:sid` or `ubuntu:26.10`):
+
+    ```sh
+    docker run --rm -v "$PWD/out:/out" -v "$PWD/debian:/debian:ro" \
+      -v "$PWD/build.sh:/build.sh:ro" debian:sid /build.sh
+    ```
+
+    where `build.sh` installs `build-essential devscripts equivs lintian
+    autopkgtest`, unpacks the tarball, copies `debian/`, runs
+    `mk-build-deps -i`, `dpkg-buildpackage -us -uc`,
+    `lintian -EvIL +pedantic` on the `.changes`, then
+    `autopkgtest <changes> -- null`.
 
 #### T4.3 ITP bug
 
@@ -395,6 +442,38 @@ Folders are opened from Salak itself or with `salak DIR`.
   useful in Debian (Markdown reader without a web engine). Put the bug number
   in `debian/changelog`.
 - **Done when:** the bug has a number.
+- **Draft** (mail to `submit@bugs.debian.org`, or the same answers to
+  `reportbug wnpp`):
+
+  ```
+  Package: wnpp
+  Severity: wishlist
+  Owner: Timothe Tizio <t.tizio@mailbox.org>
+  X-Debbugs-Cc: debian-devel@lists.debian.org
+  Subject: ITP: salak -- lightweight Markdown reader
+
+  * Package name    : salak
+    Version         : 0.2.0
+    Upstream Authors: Timothe Tizio <t.tizio@mailbox.org>
+  * URL             : https://github.com/tiziolabs/salak
+  * License         : Expat or Apache-2.0
+    Programming Lang: Rust
+    Description     : lightweight Markdown reader
+
+  Salak shows the Markdown files of a folder in a tree, and renders the
+  selected one: tables, footnotes, task lists and highlighted code blocks,
+  in light and dark modes. It reloads files changed on disk and applies a
+  user theme. It is a native GTK 4 and libadwaita application, without a
+  web engine, and can be driven entirely from the keyboard.
+
+  Debian has Markdown editors and converters, but few readers for a folder
+  of notes that do not embed a browser engine; Salak needs only GTK 4,
+  libadwaita and GtkSourceView at run time. All its Rust dependencies are
+  already in unstable.
+
+  I am the upstream author and will maintain the package, on Salsa, with
+  the help of a sponsor found through debian-mentors.
+  ```
 
 #### T4.4 Upload to mentors.debian.net and RFS
 
@@ -408,6 +487,46 @@ Folders are opened from Salak itself or with `salak DIR`.
      dh-cargo.
   3. Answer every review by a new upload; note the requests below.
 - **Done when:** a sponsor uploads the package to unstable.
+- **Draft of the RFS** (mentors.debian.net generates the template; these are
+  the parts to fill):
+
+  ```
+  Subject: RFS: salak/0.2.0-1 [ITP] -- lightweight Markdown reader
+
+  Dear mentors,
+
+  I am looking for a sponsor for my package "salak":
+
+   * Package name     : salak
+     Version          : 0.2.0-1
+     Upstream contact : Timothe Tizio <t.tizio@mailbox.org>
+   * URL              : https://github.com/tiziolabs/salak
+   * License          : Expat or Apache-2.0
+   * Vcs              : https://salsa.debian.org/SALSA_USER/salak
+     Section          : text
+
+  The source builds the following binary packages:
+
+    salak - lightweight Markdown reader
+
+  To access further information about this package, please visit:
+    https://mentors.debian.net/package/salak/
+
+  Changes for the initial release:
+
+   salak (0.2.0-1) unstable; urgency=medium
+   .
+     * Initial release. (Closes: #ITP_BUG)
+
+  Notes for the reviewer: I am the upstream author. The package builds one
+  member of a Cargo workspace with the Debian cargo wrapper (see
+  debian/rules), uses only crates packaged in unstable, and runs the
+  upstream tests at build time and in autopkgtest. Release tags are signed
+  and checked by uscan.
+
+  Regards,
+  Timothe Tizio
+  ```
 
 #### T4.5 Follow-up until unstable and testing
 
@@ -436,6 +555,22 @@ Folders are opened from Salak itself or with `salak DIR`.
      installation on each release, document it in the README.
 - **Done when:** `sudo add-apt-repository ppa:<user>/salak && sudo apt install
   salak` works on 26.04 and 26.10.
+- **State on 2026-10-08:** both builds pass locally (see the table of P1).
+  - 26.10: the Debian packaging builds unchanged in `ubuntu:26.10` with the
+    archive crates; lintian and autopkgtest pass. For the PPA, only a
+    changelog entry `0.2.0-1~ppa1~ubuntu26.10`, distribution `stonking`.
+  - 26.04: branch `ubuntu/resolute-ppa` of the packaging repository. The
+    crates of `Cargo.lock` come in a component tarball
+    `salak_<version>.orig-vendor.tar.xz` (`cargo vendor --locked vendor`, 80
+    crates, 8.6 MB), so the main tarball stays the Debian one. Changes:
+    no `librust-*` build dependencies but the `-dev` packages of GTK,
+    libadwaita and GtkSourceView; `cargo prepare-debian vendor`;
+    `Cargo.lock` kept; `dh_clean -X Cargo.toml.orig` (the vendored
+    checksums cover these files); no `Built-Using`; `debhelper-compat (= 13)`
+    and `Standards-Version: 4.7.3`, the highest 26.04 knows. The `.deb`
+    installs and runs in a clean `ubuntu:26.04`.
+  - Remaining: Launchpad account and PPA, `debuild -S` and `dput` for each
+    release with the key of T2.4.
 
 #### T5.2 Ubuntu sync
 
@@ -452,4 +587,6 @@ Folders are opened from Salak itself or with `salak DIR`.
 - ~~Licence of the artwork (T2.3)~~: answered on 2026-10-08, the icon and the
   banner are original works of the author, under MIT OR Apache-2.0 like the
   code. The banner has no other source than its PNG; it is not installed.
-- Ubuntu crate versions (T5.1): they decide whether the PPA needs vendoring.
+- ~~Ubuntu crate versions (T5.1)~~: answered on 2026-10-08, see P1. 26.04
+  needs vendoring, 26.10 does not.
+- Salsa user name, for `Vcs-*` and the RFS (T4.2, T4.4).
