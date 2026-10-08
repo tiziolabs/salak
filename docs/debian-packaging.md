@@ -142,6 +142,13 @@ with the key, shipped as `debian/upstream/signing-key.asc`.
 
 Decided on 2026-10-07: the domain `tiziolabs.com` belongs to the author.
 
+### P8. The desktop file does not claim folders
+
+Decided on 2026-10-08, closes I2 and T3.2. `inode/directory` stays out of
+`MimeType`: on desktops without a `mimeapps.list` default, as often under
+sway, `xdg-open` on a folder could pick Salak instead of the file manager.
+Folders are opened from Salak itself or with `salak DIR`.
+
 ## 4. Conventions
 
 - Upstream tasks follow section 4 of the migration plan: conventional
@@ -165,7 +172,7 @@ Decided on 2026-10-07: the domain `tiziolabs.com` belongs to the author.
 | T2.3 | Copyright of every file (R4) | done upstream; `debian/copyright` in T4.2 |
 | T2.4 | OpenPGP key, signed tags and tarball (R5, P6) | procedure written; key to create |
 | T3.1 | metainfo (I1) | done; online check after the v0.2.0 tag |
-| T3.2 | Desktop file (I2) | todo |
+| T3.2 | Desktop file (I2) | dropped, see P8 |
 | T3.3 | Man page (I3) | todo |
 | T3.4 | Packager notes (I5) | todo |
 | T4.1 | Upstream release 0.2.0 | todo |
