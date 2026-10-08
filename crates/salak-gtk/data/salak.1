@@ -50,8 +50,15 @@ Folder of the configuration, instead of
 When one of them is set, a tiling window manager is assumed and the window
 has no decorations.
 .SH EXIT STATUS
+.TP
+.B 0
+Success, including after
+.B \-\-help
+and
+.BR \-\-version .
+.TP
 .B 2
-on invalid arguments or a missing path.
+Invalid arguments, or a path or theme file that does not exist.
 .SH SEE ALSO
 Project page:
 .UR https://github.com/tiziolabs/salak
