@@ -8,7 +8,11 @@
   `<br>`, `<kbd>`, `<sup>` and `<sub>`. The application identifier is
   `com.tiziolabs.salak`: the desktop entry, the icon and the sway `app_id`
   use it. Windows keeps the Tauri application.
-- The Debian package ships AppStream metadata and a man page.
+- The Debian package ships AppStream metadata, a man page and screenshots of
+  the application.
+- Building Salak on Linux needs Rust 1.92 (on Debian 13, from the backports).
+  Release packages use the `dist` Cargo profile; `release` keeps Cargo's
+  defaults for distributions.
 - **Breaking:** themes are now small INI files (`theme.ini`) instead of CSS
   (`style.css`), which is no longer read. The option `--css` is replaced by
   `--theme`. A theme sets colors for the light and dark modes, fonts, the
