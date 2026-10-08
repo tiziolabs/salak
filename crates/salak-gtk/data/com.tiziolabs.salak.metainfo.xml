@@ -20,12 +20,30 @@
   <launchable type="desktop-id">com.tiziolabs.salak.desktop</launchable>
   <url type="homepage">https://github.com/tiziolabs/salak</url>
   <url type="bugtracker">https://github.com/tiziolabs/salak/issues</url>
+  <url type="vcs-browser">https://github.com/tiziolabs/salak</url>
+  <branding>
+    <color type="primary" scheme_preference="light">#FBF3E4</color>
+    <color type="primary" scheme_preference="dark">#3A2216</color>
+  </branding>
+  <!-- From a release tag, so that a published version never shows a newer
+       interface. Update the tag at every release. -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/tiziolabs/salak/main/docs/assets/salak-banner.png</image>
-      <caption>The banner of Salak</caption>
+      <image>https://raw.githubusercontent.com/tiziolabs/salak/v0.2.0/docs/assets/screenshot-light.png</image>
+      <caption>A folder of notes, with a table, a task list and highlighted code</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tiziolabs/salak/v0.2.0/docs/assets/screenshot-dark.png</image>
+      <caption>The same document in dark mode</caption>
     </screenshot>
   </screenshots>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
   <content_rating type="oars-1.1"/>
   <provides>
     <binary>salak</binary>
@@ -34,6 +52,10 @@
     <name>Timothe Tizio</name>
   </developer>
   <releases>
-    <release version="0.1.0" date="2026-10-04"/>
+    <release version="0.1.0" date="2026-10-04">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
   </releases>
 </component>

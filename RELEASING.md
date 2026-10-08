@@ -26,7 +26,9 @@ configuration and the packages take it from there.
 2. Replace `Unreleased` with the date in `CHANGELOG.md`.
 3. Check the version and the date at the top of
    `crates/salak-gtk/data/salak.1` (`.TH`), and add the release to
-   `<releases>` in `crates/salak-gtk/data/com.tiziolabs.salak.metainfo.xml`.
+   `<releases>` in `crates/salak-gtk/data/com.tiziolabs.salak.metainfo.xml`, newest first, with a short
+   description; point its screenshot URLs to the new tag. If the interface changed, take new screenshots
+   (`docs/assets/screenshot-*.png`): see "Screenshots" below.
 4. Commit, tag with a signature and push:
 
    ```sh
@@ -80,6 +82,27 @@ gh release create v0.1.0 --draft --title "Salak 0.1.0" --notes "…" \
 # Windows: add the Windows files, then publish
 gh release upload v0.1.0 dist\Salak_0.1.0_x64-setup.exe dist\salak-0.1.0-windows-x64-portable.zip
 gh release edit v0.1.0 --draft=false
+```
+
+## Screenshots
+
+The screenshots of the AppStream metadata show `project-plan.md` of
+`docs/assets/screenshot-notes/`, with the default theme, in a 1400 × 900
+window. A headless sway keeps the desktop out of the picture:
+
+```sh
+cfg=$(mktemp -d)
+printf 'output HEADLESS-1 resolution 1400x900\ndefault_border none\n' > "$cfg/sway"
+WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 WLR_RENDERER=pixman sway -c "$cfg/sway" &
+# Note the WAYLAND_DISPLAY it creates in $XDG_RUNTIME_DIR, here wayland-2.
+cd docs/assets/screenshot-notes
+for mode in light dark; do
+  env -u SWAYSOCK WAYLAND_DISPLAY=wayland-2 XDG_CONFIG_HOME="$cfg" \
+    ADW_DEBUG_COLOR_SCHEME=prefer-$mode ../../../target/release/salak project-plan.md &
+  sleep 4
+  WAYLAND_DISPLAY=wayland-2 grim ../screenshot-$mode.png
+  kill $!
+done
 ```
 
 ## Signing

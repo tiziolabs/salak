@@ -1,0 +1,3 @@
+# Sambal
+
+Chilies, shallots, garlic.
