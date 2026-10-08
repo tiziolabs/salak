@@ -174,7 +174,7 @@ Folders are opened from Salak itself or with `salak DIR`.
 | T3.1 | metainfo (I1) | done; online check after the v0.2.0 tag |
 | T3.2 | Desktop file (I2) | dropped, see P8 |
 | T3.3 | Man page (I3) | done |
-| T3.4 | Packager notes (I5) | todo |
+| T3.4 | Packager notes (I5) | done |
 | T4.1 | Upstream release 0.2.0 | todo |
 | T4.2 | Debian source package on Salsa | todo |
 | T4.3 | ITP bug | todo |

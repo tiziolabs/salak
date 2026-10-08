@@ -125,6 +125,37 @@ from the libraries the binary links to, so it only installs on systems at
 least as recent as the build system: build it on the oldest release to
 support.
 
+### Packaging
+
+Notes for distribution packagers:
+
+- Package `salak-core` and `salak-gtk` only, from the signed tarball of a
+  release (`salak-<version>.tar.gz` and its `.asc`, see
+  [RELEASING.md](RELEASING.md)). `crates/salak-tauri` is the Windows
+  application; it is a workspace of its own and is not needed.
+- Rust dependencies: `gtk4`, `libadwaita`, `sourceview5` (feature
+  `highlight`, on by default) and `pulldown-cmark`, at the versions of
+  Debian unstable; `dunce` on Windows only. Nothing is vendored.
+- Build with `cargo build --release -p salak-gtk`; test with
+  `cargo test -p salak-core -p salak-gtk`. The tests need neither a display
+  nor the network.
+- Files to install, all from `crates/salak-gtk/data/`:
+
+  | File | Destination |
+  | --- | --- |
+  | `target/release/salak` | `/usr/bin/` |
+  | `com.tiziolabs.salak.desktop` | `/usr/share/applications/` |
+  | `com.tiziolabs.salak.metainfo.xml` | `/usr/share/metainfo/` |
+  | `salak.1` | `/usr/share/man/man1/` |
+  | `icons/com.tiziolabs.salak.svg` | `/usr/share/icons/hicolor/scalable/apps/` |
+  | `icons/com.tiziolabs.salak.png` | `/usr/share/icons/hicolor/128x128/apps/` |
+
+- The bitmap icons are rendered from `icons/salak.svg` by
+  `scripts/render-icons.sh`.
+
+The Debian packaging lives on Salsa; its progress is tracked in
+[docs/debian-packaging.md](docs/debian-packaging.md).
+
 ### Windows
 
 The Windows application is the Tauri one. `cargo build --release` in
